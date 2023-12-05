@@ -7,18 +7,19 @@ import (
 	"os"
 	"runtime/pprof"
 
-	"github.com/just-hms/pulse/pkg/index"
 	"github.com/just-hms/pulse/pkg/readers"
+	"github.com/just-hms/pulse/pkg/spimi"
 )
 
-var cpuprofile = flag.Bool("cpuprofile", false, "write cpu profile to file")
+var cpuprofile = flag.Bool("profile", false, "write cpu profile to \"cpu.prof\"")
 
 func main() {
 	flag.Parse()
+
 	args := flag.Args()
 
 	if *cpuprofile {
-		f, err := os.Create("profile.out")
+		f, err := os.Create("cpu.prof")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -35,7 +36,7 @@ func main() {
 		}
 	}
 
-	r := readers.NewMsMarco(bufio.NewReader(f), 100_000)
-	index.Load(r)
+	r := readers.NewMsMarco(bufio.NewReader(f), 50_000)
 
+	spimi.Load(r, 16)
 }

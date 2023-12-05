@@ -6,29 +6,26 @@ import (
 	"log"
 	"strings"
 
-	"github.com/just-hms/pulse/pkg/entity"
-	"github.com/just-hms/pulse/pkg/index"
+	"github.com/just-hms/pulse/pkg/spimi"
 )
 
-var _ index.ChunkReader = &msMarco{}
+var _ spimi.ChunkReader = &msMarco{}
 
 type msMarco struct {
-	chunkSize    int
-	reader       *bufio.Reader
-	indexCounter uint
+	chunkSize int
+	reader    *bufio.Reader
 }
 
-func NewMsMarco(r *bufio.Reader, c int) *msMarco {
+func NewMsMarco(r *bufio.Reader, chunkSize int) *msMarco {
 	return &msMarco{
-		chunkSize:    c,
-		reader:       r,
-		indexCounter: 0,
+		reader:    r,
+		chunkSize: chunkSize,
 	}
 }
 
 // Read implements index.ChunkReader.
-func (r *msMarco) Read() ([]*entity.Document, error) {
-	res := make([]*entity.Document, r.chunkSize)
+func (r *msMarco) Read() ([]spimi.Document, error) {
+	res := make([]spimi.Document, r.chunkSize)
 
 	for i := 0; i < r.chunkSize; i++ {
 		s, err := r.reader.ReadString('\n')
@@ -44,13 +41,10 @@ func (r *msMarco) Read() ([]*entity.Document, error) {
 			log.Fatalf("'%s' is malformed\n", strings.TrimSpace(s))
 		}
 
-		res[i] = &entity.Document{
-			ID:      r.indexCounter,
+		res[i] = spimi.Document{
 			No:      sPlitted[0],
 			Content: strings.TrimSpace(sPlitted[1]),
 		}
-		r.indexCounter++
 	}
-
 	return res, nil
 }

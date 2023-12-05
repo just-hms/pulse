@@ -2,6 +2,7 @@ module github.com/just-hms/pulse
 
 go 1.21.1
 
-require github.com/kljensen/snowball v0.8.0
-
-require github.com/armon/go-radix v1.0.0 // indirect
+require (
+	github.com/blevesearch/go-porterstemmer v1.0.3
+	golang.org/x/exp v0.0.0-20231127185646-65229373498e
+)
