@@ -83,8 +83,9 @@ func Stem(tokens []string) {
 	for i, t := range tokens {
 		go func(i int, t string) {
 			defer wg.Done()
-			kek := []rune(t)
-			tokens[i] = string(porterstemmer.StemWithoutLowerCasing(kek))
+			tokens[i] = string(
+				porterstemmer.StemWithoutLowerCasing([]rune(t)),
+			)
 		}(i, t)
 	}
 

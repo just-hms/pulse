@@ -5,15 +5,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/just-hms/pulse/pkg/spimi/info"
-	"github.com/just-hms/pulse/pkg/word"
+	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
+	"github.com/just-hms/pulse/pkg/spimi/preprocess"
+	"github.com/just-hms/pulse/pkg/spimi/spimireader"
 )
 
-func Load(r ChunkReader, numWorkers int) []string {
-	chunksQueue := make(chan []Document, numWorkers)
+func Parse(r spimireader.Chunk, numWorkers int) error {
+	chunksQueue := make(chan []spimireader.Document, numWorkers)
 	consumerAvailable := make(chan bool, numWorkers)
 
-	inf := info.NewSpimiBuilder()
+	errChan := make(chan error, 1)
+
+	b := NewBuilder()
 
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
@@ -27,10 +30,8 @@ func Load(r ChunkReader, numWorkers int) []string {
 
 				for _, doc := range chunk {
 					// for every chunk
-					tokens := word.Tokenize(doc.Content)
-					tokens = word.StopWordsRemoval(tokens)
-					word.Stem(tokens)
 
+					tokens := preprocess.GetTokens(doc.Content)
 					freqs := make(map[string]uint32, 100)
 					for _, term := range tokens {
 						if _, ok := freqs[term]; !ok {
@@ -40,12 +41,12 @@ func Load(r ChunkReader, numWorkers int) []string {
 						}
 					}
 
-					inf.Lock()
-					inf.Add(freqs, info.Doc{
+					b.Lock()
+					b.Add(freqs, inverseindex.Document{
 						No:  doc.No,
 						Len: len(doc.Content),
 					})
-					inf.Unlock()
+					b.Unlock()
 				}
 				consumerAvailable <- true
 			}
@@ -58,7 +59,8 @@ func Load(r ChunkReader, numWorkers int) []string {
 		for {
 			chunk, err := r.Read()
 			if err != nil {
-				panic(err)
+				errChan <- err
+				return
 			}
 			if len(chunk) == 0 {
 				return // Stop when there are no more chunks
@@ -76,6 +78,8 @@ func Load(r ChunkReader, numWorkers int) []string {
 	for {
 		var ok = true
 		select {
+		case err := <-errChan:
+			return err
 		case _, ok = <-chunksQueue:
 			if ok {
 				time.Sleep(sleep)
@@ -91,19 +95,17 @@ func Load(r ChunkReader, numWorkers int) []string {
 			continue
 		}
 
-		inf.Lock()
-		err := inf.Dump("data/dump")
+		b.Lock()
+		err := b.Encode("data/dump")
 		if err != nil {
-			panic(err)
+			return err
 		}
-		inf.Unlock()
+		b.Unlock()
 
 		if !ok {
 			break
 		}
 	}
 
-	// Wait for all workers to finish
-
-	return []string{}
+	return nil
 }
