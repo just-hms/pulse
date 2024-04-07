@@ -32,7 +32,7 @@ func (l Lexicon) EncodeTerms(w io.Writer) error {
 	for _, term := range terms {
 		lx := l[term]
 
-		span := uint32(len(lx.Posting)) * 32 * 8
+		span := uint32(len(lx.Posting)) * 4
 		t := Term{
 			Value:       term,
 			DocFreq:     lx.DocFreq,

@@ -1,7 +1,9 @@
 package engine
 
 import (
+	"encoding/binary"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -56,7 +58,7 @@ func Search(q string, path string, k int) ([]uint32, error) {
 			for {
 				t := inverseindex.Term{}
 				err := termDecoder.Decode(&t)
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 				if err != nil {
@@ -72,13 +74,11 @@ func Search(q string, path string, k int) ([]uint32, error) {
 			if err != nil {
 				return err
 			}
-			docDecoder := gob.NewDecoder(termsFile)
 
 			freqFile, err := os.Open(fmt.Sprintf("%s/freqs.bin", filepath.Join(path, partition.Name())))
 			if err != nil {
 				return err
 			}
-			freqDecoder := gob.NewDecoder(freqFile)
 
 			seekers := make([]*seeker, 0, len(terms))
 
@@ -89,14 +89,20 @@ func Search(q string, path string, k int) ([]uint32, error) {
 
 				var id, freq uint32
 				docFile.Seek(s.pos, 0)
-				docDecoder.Decode(&id)
-				freqFile.Seek(s.pos, 0)
-				freqDecoder.Decode(&freq)
+				err := binary.Read(docFile, binary.LittleEndian, &id)
+				if err != nil {
+					panic(err)
+				}
+				termsFile.Seek(s.pos, 0)
+				err = binary.Read(termsFile, binary.LittleEndian, &freq)
+				if err != nil {
+					panic(err)
+				}
 
 				s.id = id
 				// TODO: do the actual score
 				s.score = freq
-				s.pos += 32 * 8
+				s.pos += 4
 				seekers = append(seekers, s)
 			}
 
@@ -109,6 +115,10 @@ func Search(q string, path string, k int) ([]uint32, error) {
 				curSeek := slices.MinFunc(seekers, func(a, b *seeker) int {
 					return int(a.id) - int(b.id)
 				})
+
+				// TODO: doc score should be weighted using all the terms
+				// - curSeek could be multiples
+				// - update all used curSeeeks
 
 				// ADD TO THE RESULTS
 				scores = append(scores, docInfo{
@@ -125,14 +135,22 @@ func Search(q string, path string, k int) ([]uint32, error) {
 
 				var id, freq uint32
 				docFile.Seek(curSeek.pos, 0)
-				docDecoder.Decode(&id)
+				err = binary.Read(docFile, binary.LittleEndian, &id)
+				if err != nil {
+					return err
+				}
 				freqFile.Seek(curSeek.pos, 0)
-				freqDecoder.Decode(&freq)
+				err = binary.Read(termsFile, binary.LittleEndian, &freq)
+				if err != nil {
+					return err
+				}
+
+				fmt.Println(id)
 
 				curSeek.id = id
 				// TODO: do the actual score
 				curSeek.score = freq
-				curSeek.pos += 32 * 8
+				curSeek.pos += 4
 
 				// TODO: remove finished seekers
 				seekers = slices.DeleteFunc(seekers, func(s *seeker) bool {
