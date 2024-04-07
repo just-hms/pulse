@@ -102,6 +102,7 @@ func Search(q string, path string, k int) ([]uint32, error) {
 				s.id = id
 				// TODO: do the actual score
 				s.score = freq
+				// TODO: specify bit position in future
 				s.pos += 4
 				seekers = append(seekers, s)
 			}
@@ -148,6 +149,7 @@ func Search(q string, path string, k int) ([]uint32, error) {
 				curSeek.id = id
 				// TODO: do the actual score
 				curSeek.score = freq
+				// TODO: specify bit position in future
 				curSeek.pos += 4
 
 				// TODO: remove finished seekers

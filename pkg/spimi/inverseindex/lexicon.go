@@ -32,6 +32,7 @@ func (l Lexicon) EncodeTerms(w io.Writer) error {
 	for _, term := range terms {
 		lx := l[term]
 
+		// TODO: specify the bit position in future
 		span := uint32(len(lx.Posting)) * 4
 		t := Term{
 			Value:       term,
@@ -50,6 +51,7 @@ func (l Lexicon) EncodeTerms(w io.Writer) error {
 
 func (l Lexicon) EncodePostings(w io.Writer) error {
 	enc := bufio.NewWriter(w)
+	// TODO: do this only one time
 	terms := maps.Keys(l)
 	slices.Sort(terms)
 
