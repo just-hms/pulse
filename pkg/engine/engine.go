@@ -145,8 +145,6 @@ func Search(q string, path string, k int) ([]uint32, error) {
 					return err
 				}
 
-				fmt.Println(id)
-
 				curSeek.id = id
 				// TODO: do the actual score
 				curSeek.score = freq
