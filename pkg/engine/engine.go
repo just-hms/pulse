@@ -34,11 +34,12 @@ func Search(q string, path string, k int) ([]uint32, error) {
 		id    uint32
 	}
 
-	resChan := make(chan []docInfo, len(partitions))
+	results := make([][]docInfo, len(partitions))
 
 	// 	launch the query for each partition
-	for _, partition := range partitions {
+	for i, partition := range partitions {
 
+		i := i
 		partition := partition
 
 		wg.Go(func() error {
@@ -67,13 +68,13 @@ func Search(q string, path string, k int) ([]uint32, error) {
 				}
 			}
 
-			docFile, err := os.Open(fmt.Sprintf("%s/docs.bin", filepath.Join(path, partition.Name())))
+			docFile, err := os.Open(fmt.Sprintf("%s/doc.bin", filepath.Join(path, partition.Name())))
 			if err != nil {
 				return err
 			}
 			docDecoder := gob.NewDecoder(termsFile)
 
-			freqFile, err := os.Open(fmt.Sprintf("%s/freq.bin", filepath.Join(path, partition.Name())))
+			freqFile, err := os.Open(fmt.Sprintf("%s/freqs.bin", filepath.Join(path, partition.Name())))
 			if err != nil {
 				return err
 			}
@@ -82,7 +83,7 @@ func Search(q string, path string, k int) ([]uint32, error) {
 			seekers := make([]*seeker, len(terms))
 
 			for i, t := range terms {
-				curSeek := seekers[i]
+				curSeek := &seeker{}
 				curSeek.seeek = int64(t.StartOffset)
 
 				var id, freq uint32
@@ -95,11 +96,15 @@ func Search(q string, path string, k int) ([]uint32, error) {
 				// TODO: do the actual score
 				curSeek.score = freq
 				curSeek.seeek += 32 * 8
+				seekers[i] = curSeek
 			}
 
 			scores := make([]docInfo, 0, k)
 
 			for {
+				if len(seekers) == 0 {
+					break
+				}
 				curSeek := slices.MinFunc(seekers, func(a, b *seeker) int {
 					return int(a.id) - int(b.id)
 				})
@@ -128,10 +133,13 @@ func Search(q string, path string, k int) ([]uint32, error) {
 				curSeek.score = freq
 				curSeek.seeek += 32 * 8
 
-				// TODO: check if the seeker has finished
+				// TODO: remove finished seekers
+				seekers = slices.DeleteFunc(seekers, func(s *seeker) bool {
+					return s.seeek > s.stop
+				})
 			}
-
-			resChan <- scores
+			results[i] = scores
+			fmt.Println(scores)
 			return nil
 		})
 	}
@@ -141,8 +149,8 @@ func Search(q string, path string, k int) ([]uint32, error) {
 	}
 
 	var scores []docInfo
-	for result := range resChan {
-		scores = append(scores, result...)
+	for _, res := range results {
+		scores = append(scores, res...)
 	}
 
 	slices.SortFunc(scores, func(a, b docInfo) int {
