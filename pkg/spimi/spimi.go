@@ -41,12 +41,10 @@ func Parse(r spimireader.Chunk, numWorkers int) error {
 						}
 					}
 
-					b.Lock()
 					b.Add(freqs, inverseindex.Document{
 						No:  doc.No,
 						Len: len(doc.Content),
 					})
-					b.Unlock()
 				}
 				consumerAvailable <- true
 			}
@@ -72,7 +70,7 @@ func Parse(r spimireader.Chunk, numWorkers int) error {
 
 	// dumper
 	var memStats runtime.MemStats
-	var memoryThreshold uint64 = 8 * 1024 * 1024 * 1024
+	const memoryThreshold uint64 = 8 * 1024 * 1024 * 1024
 
 	sleep := 10 * time.Second
 	for {
@@ -95,12 +93,10 @@ func Parse(r spimireader.Chunk, numWorkers int) error {
 			continue
 		}
 
-		b.Lock()
 		err := b.Encode("data/dump")
 		if err != nil {
 			return err
 		}
-		b.Unlock()
 
 		if !ok {
 			break
