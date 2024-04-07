@@ -10,7 +10,7 @@ import (
 	"github.com/just-hms/pulse/pkg/spimi/spimireader"
 )
 
-func Parse(r spimireader.Chunk, numWorkers int) error {
+func Parse(r spimireader.Chunk, numWorkers int, path string) error {
 	chunksQueue := make(chan []spimireader.Document, numWorkers)
 	consumerAvailable := make(chan bool, numWorkers)
 
@@ -93,7 +93,7 @@ func Parse(r spimireader.Chunk, numWorkers int) error {
 			continue
 		}
 
-		err := b.Encode("data/dump")
+		err := b.Encode(path)
 		if err != nil {
 			return err
 		}

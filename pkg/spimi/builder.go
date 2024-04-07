@@ -98,7 +98,7 @@ func (b *builder) Encode(folderPath string) error {
 		if err != nil {
 			return err
 		}
-		b.Lexicon.EncodeTerms(freqFile)
+		b.Lexicon.EncodeFreqs(freqFile)
 		return freqFile.Close()
 	})
 

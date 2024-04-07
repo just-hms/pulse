@@ -39,7 +39,12 @@ func main() {
 
 	r := readers.NewMsMarco(bufio.NewReader(f), 50_000)
 
-	err := spimi.Parse(r, 16)
+	err := os.RemoveAll("data/dump")
+	if err != nil {
+		panic(err)
+	}
+
+	err = spimi.Parse(r, 16, "data/dump")
 	if err != nil {
 		panic(err)
 	}

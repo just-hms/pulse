@@ -1,6 +1,6 @@
 module github.com/just-hms/pulse
 
-go 1.21.1
+go 1.22
 
 require (
 	github.com/blevesearch/go-porterstemmer v1.0.3

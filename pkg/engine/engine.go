@@ -25,7 +25,7 @@ func Search(q string, path string, k int) ([]uint32, error) {
 	type seeker struct {
 		id    uint32
 		score uint32
-		seeek int64
+		pos   int64
 		stop  int64
 	}
 
@@ -80,23 +80,24 @@ func Search(q string, path string, k int) ([]uint32, error) {
 			}
 			freqDecoder := gob.NewDecoder(freqFile)
 
-			seekers := make([]*seeker, len(terms))
+			seekers := make([]*seeker, 0, len(terms))
 
-			for i, t := range terms {
-				curSeek := &seeker{}
-				curSeek.seeek = int64(t.StartOffset)
+			for _, t := range terms {
+				s := &seeker{}
+				s.pos = int64(t.StartOffset)
+				s.stop = int64(t.EndOffset)
 
 				var id, freq uint32
-				docFile.Seek(curSeek.seeek, 0)
+				docFile.Seek(s.pos, 0)
 				docDecoder.Decode(&id)
-				freqFile.Seek(curSeek.seeek, 0)
+				freqFile.Seek(s.pos, 0)
 				freqDecoder.Decode(&freq)
 
-				curSeek.id = id
+				s.id = id
 				// TODO: do the actual score
-				curSeek.score = freq
-				curSeek.seeek += 32 * 8
-				seekers[i] = curSeek
+				s.score = freq
+				s.pos += 32 * 8
+				seekers = append(seekers, s)
 			}
 
 			scores := make([]docInfo, 0, k)
@@ -123,23 +124,22 @@ func Search(q string, path string, k int) ([]uint32, error) {
 				// SEEK TO THE NEXT
 
 				var id, freq uint32
-				docFile.Seek(curSeek.seeek, 0)
+				docFile.Seek(curSeek.pos, 0)
 				docDecoder.Decode(&id)
-				freqFile.Seek(curSeek.seeek, 0)
+				freqFile.Seek(curSeek.pos, 0)
 				freqDecoder.Decode(&freq)
 
 				curSeek.id = id
 				// TODO: do the actual score
 				curSeek.score = freq
-				curSeek.seeek += 32 * 8
+				curSeek.pos += 32 * 8
 
 				// TODO: remove finished seekers
 				seekers = slices.DeleteFunc(seekers, func(s *seeker) bool {
-					return s.seeek > s.stop
+					return s.pos > s.stop
 				})
 			}
 			results[i] = scores
-			fmt.Println(scores)
 			return nil
 		})
 	}
@@ -156,7 +156,8 @@ func Search(q string, path string, k int) ([]uint32, error) {
 	slices.SortFunc(scores, func(a, b docInfo) int {
 		return int(a.score) - int(b.score)
 	})
-	res := make([]uint32, k)
+	scores = scores[:min(len(scores), k)]
+	res := make([]uint32, len(scores))
 	for i := range scores {
 		res[i] = scores[i].id
 	}

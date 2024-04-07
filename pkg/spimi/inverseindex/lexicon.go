@@ -1,6 +1,8 @@
 package inverseindex
 
 import (
+	"bufio"
+	"encoding/binary"
 	"encoding/gob"
 	"io"
 	"slices"
@@ -47,14 +49,38 @@ func (l Lexicon) EncodeTerms(w io.Writer) error {
 }
 
 func (l Lexicon) EncodePostings(w io.Writer) error {
-	enc := gob.NewEncoder(w)
+	enc := bufio.NewWriter(w)
 	terms := maps.Keys(l)
 	slices.Sort(terms)
 
 	for _, term := range terms {
 		lx := l[term]
-		if err := enc.Encode(lx.Posting); err != nil {
-			return err
+		buf := make([]byte, 4)
+		for _, p := range lx.Posting {
+			binary.LittleEndian.PutUint32(buf, p)
+			_, err := enc.Write(buf)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (l Lexicon) EncodeFreqs(w io.Writer) error {
+	enc := bufio.NewWriter(w)
+	terms := maps.Keys(l)
+	slices.Sort(terms)
+
+	for _, term := range terms {
+		lx := l[term]
+		buf := make([]byte, 4)
+		for _, p := range lx.Frequencies {
+			binary.LittleEndian.PutUint32(buf, p)
+			_, err := enc.Write(buf)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
