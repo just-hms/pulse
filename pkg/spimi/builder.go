@@ -20,7 +20,7 @@ type builder struct {
 	dumpCounter uint32
 }
 
-func NewBuilder() *builder {
+func newBuilder() *builder {
 	return &builder{
 		Lexicon: make(inverseindex.Lexicon),
 	}
@@ -53,9 +53,9 @@ func (b *builder) Add(freqs map[string]uint32, doc inverseindex.Document) {
 func (b *builder) Encode(folderPath string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	defer func() { b.dumpCounter++ }()
 
 	log.Println("dumping...")
-	b.dumpCounter++
 
 	var wg errgroup.Group
 

@@ -16,7 +16,7 @@ func Parse(r spimireader.Chunk, numWorkers int) error {
 
 	errChan := make(chan error, 1)
 
-	b := NewBuilder()
+	b := newBuilder()
 
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
