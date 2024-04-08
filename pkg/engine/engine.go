@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"encoding/binary"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -10,10 +9,26 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/just-hms/pulse/pkg/engine/seeker"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
 	"github.com/just-hms/pulse/pkg/spimi/preprocess"
+	"github.com/just-hms/pulse/pkg/structures/slicex"
 	"golang.org/x/sync/errgroup"
 )
+
+type docInfo struct {
+	score float64
+	id    uint32
+}
+
+func getDocScore(seekers []*seeker.Seeker) docInfo {
+	res := 0.0
+	docID := seekers[0].ID
+	for _, s := range seekers {
+		res += float64(s.Freq)
+	}
+	return docInfo{score: res, id: docID}
+}
 
 func Search(q string, path string, k int) ([]uint32, error) {
 	tokens := preprocess.GetTokens(q)
@@ -23,18 +38,6 @@ func Search(q string, path string, k int) ([]uint32, error) {
 		return nil, err
 	}
 	var wg errgroup.Group
-
-	type seeker struct {
-		id    uint32
-		score uint32
-		pos   int64
-		stop  int64
-	}
-
-	type docInfo struct {
-		score uint32
-		id    uint32
-	}
 
 	results := make([][]docInfo, len(partitions))
 
@@ -80,30 +83,10 @@ func Search(q string, path string, k int) ([]uint32, error) {
 				return err
 			}
 
-			seekers := make([]*seeker, 0, len(terms))
-
+			seekers := make([]*seeker.Seeker, 0, len(terms))
 			for _, t := range terms {
-				s := &seeker{}
-				s.pos = int64(t.StartOffset)
-				s.stop = int64(t.EndOffset)
-
-				var id, freq uint32
-				docFile.Seek(s.pos, 0)
-				err := binary.Read(docFile, binary.LittleEndian, &id)
-				if err != nil {
-					panic(err)
-				}
-				termsFile.Seek(s.pos, 0)
-				err = binary.Read(termsFile, binary.LittleEndian, &freq)
-				if err != nil {
-					panic(err)
-				}
-
-				s.id = id
-				// TODO: do the actual score
-				s.score = freq
-				// TODO: specify bit position in future
-				s.pos += 4
+				s := seeker.NewSeeker(docFile, freqFile, t)
+				s.Next()
 				seekers = append(seekers, s)
 			}
 
@@ -113,49 +96,26 @@ func Search(q string, path string, k int) ([]uint32, error) {
 				if len(seekers) == 0 {
 					break
 				}
-				curSeek := slices.MinFunc(seekers, func(a, b *seeker) int {
-					return int(a.id) - int(b.id)
+				curSeeks := slicex.MinsFunc(seekers, func(a, b *seeker.Seeker) int {
+					return int(a.ID) - int(b.ID)
 				})
 
-				// TODO: doc score should be weighted using all the terms
-				// - curSeek could be multiples
-				// - update all used curSeeeks
+				docScore := getDocScore(curSeeks)
 
-				// ADD TO THE RESULTS
-				scores = append(scores, docInfo{
-					id:    curSeek.id,
-					score: curSeek.score,
-				})
+				// TODO: refactor
+				scores = append(scores, docScore)
 				slices.SortFunc(scores, func(a, b docInfo) int {
 					return int(a.score) - int(b.score)
 				})
 				// keep only k elements
-				scores = scores[:min(len(scores), k)]
+				scores = slicex.Cap(scores, k)
 
-				// SEEK TO THE NEXT
-
-				var id, freq uint32
-				docFile.Seek(curSeek.pos, 0)
-				err = binary.Read(docFile, binary.LittleEndian, &id)
-				if err != nil {
-					return err
+				// seek to the next
+				for _, s := range curSeeks {
+					s.Next()
 				}
-				freqFile.Seek(curSeek.pos, 0)
-				err = binary.Read(termsFile, binary.LittleEndian, &freq)
-				if err != nil {
-					return err
-				}
-
-				curSeek.id = id
-				// TODO: do the actual score
-				curSeek.score = freq
-				// TODO: specify bit position in future
-				curSeek.pos += 4
-
-				// TODO: remove finished seekers
-				seekers = slices.DeleteFunc(seekers, func(s *seeker) bool {
-					return s.pos > s.stop
-				})
+				// remove all finished seekers
+				seekers = slices.DeleteFunc(seekers, seeker.EOD)
 			}
 			results[i] = scores
 			return nil
@@ -174,7 +134,7 @@ func Search(q string, path string, k int) ([]uint32, error) {
 	slices.SortFunc(scores, func(a, b docInfo) int {
 		return int(a.score) - int(b.score)
 	})
-	scores = scores[:min(len(scores), k)]
+	scores = slicex.Cap(scores, k)
 	res := make([]uint32, len(scores))
 	for i := range scores {
 		res[i] = scores[i].id
