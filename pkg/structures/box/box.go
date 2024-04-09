@@ -23,8 +23,6 @@ type box[T any] struct {
 	cmp     func(a, b T) int
 }
 
-// TODO: make it variadic
-
 // Add add a element to a box
 func (b *box[T]) Add(els ...T) {
 	for _, el := range els {
