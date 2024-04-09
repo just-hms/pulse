@@ -10,8 +10,8 @@ import (
 	"slices"
 
 	"github.com/just-hms/pulse/pkg/engine/seeker"
+	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
-	"github.com/just-hms/pulse/pkg/spimi/preprocess"
 	"github.com/just-hms/pulse/pkg/structures/slicex"
 	"golang.org/x/sync/errgroup"
 )

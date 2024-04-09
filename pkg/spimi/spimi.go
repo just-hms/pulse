@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
-	"github.com/just-hms/pulse/pkg/spimi/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/spimireader"
 )
 

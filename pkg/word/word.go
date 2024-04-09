@@ -9,10 +9,10 @@ import (
 )
 
 var punctuationRemover = strings.NewReplacer(
-	".", "", ",", "", "!", "", "?", "",
-	";", "", ":", "", "'", "", "\"", "",
-	"(", "", ")", "", "[", "", "]", "",
-	"{", "", "}", "",
+	".", " ", ",", " ", "!", " ", "?", " ",
+	";", " ", ":", " ", "'", " ", "\" ", " ",
+	"(", " ", ")", " ", "[", " ", "]", " ",
+	"{", " ", "}", " ",
 )
 
 func Tokenize(s string) []string {
@@ -32,40 +32,13 @@ func isStopword(word string) bool {
 		"from", "at", "as", "your",
 		"all", "have", "new", "more",
 		"an", "was", "we", "will",
-		"home", "can", "us", "about",
-		"if", "page", "my", "has",
-		"search", "free", "but", "our",
-		"one", "other", "do", "no",
-		"information", "time", "they", "site",
-		"he", "up", "may", "what",
-		"which", "their", "news", "out",
+		"can", "if", "my", "has",
+		"but", "our", "one", "do", "no",
+		"he", "up", "may", "out",
 		"use", "any", "see", "only",
-		"so", "his", "when", "contact",
-		"here", "business", "who", "web",
-		"also", "now", "help", "get",
-		"pm", "view", "online", "first",
-		"am", "been", "would", "how",
-		"were", "me", "services", "some",
-		"these", "click", "like", "service",
-		"x", "than", "find", "price",
-		"date", "back", "top", "people",
-		"had", "list", "name", "just",
-		"over", "state", "year", "day",
-		"into", "email", "two", "health",
-		"n", "world", "re", "next",
-		"used", "go", "b", "work",
-		"last", "most", "music", "buy",
-		"data", "make", "them", "should",
-		"product", "system", "post", "her",
-		"city", "t", "add", "policy",
-		"number", "such", "please", "great",
-		"united", "hotel", "real", "f",
-		"item", "international", "center", "ebay",
-		"must", "store", "travel", "comments",
-		"made", "report", "off", "member",
-		"details", "line", "terms", "before",
-		"hotels", "did", "send", "right",
-		"type", "because", "local", "those", "eing", "":
+		"so", "his", "when", "here", "who",
+		"now", "get", "pm", "view", "am",
+		"been", "how", "were", "me", "some":
 		return true
 	}
 	return false
