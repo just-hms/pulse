@@ -12,6 +12,7 @@ import (
 	"github.com/just-hms/pulse/pkg/engine/seeker"
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
+	"github.com/just-hms/pulse/pkg/structures/box"
 	"github.com/just-hms/pulse/pkg/structures/slicex"
 	"golang.org/x/sync/errgroup"
 )
@@ -20,6 +21,8 @@ type docInfo struct {
 	score float64
 	id    uint32
 }
+
+func MinDoc(a, b docInfo) int { return int(a.score) - int(b.score) }
 
 func getDocScore(seekers []*seeker.Seeker) docInfo {
 	res := 0.0
@@ -90,7 +93,7 @@ func Search(q string, path string, k int) ([]uint32, error) {
 				seekers = append(seekers, s)
 			}
 
-			scores := make([]docInfo, 0, k)
+			scores := box.NewBox(MinDoc, k)
 
 			for {
 				if len(seekers) == 0 {
@@ -101,14 +104,7 @@ func Search(q string, path string, k int) ([]uint32, error) {
 				})
 
 				docScore := getDocScore(curSeeks)
-
-				// TODO: refactor
-				scores = append(scores, docScore)
-				slices.SortFunc(scores, func(a, b docInfo) int {
-					return int(a.score) - int(b.score)
-				})
-				// keep only k elements
-				scores = slicex.Cap(scores, k)
+				scores.Add(docScore)
 
 				// seek to the next
 				for _, s := range curSeeks {
@@ -117,7 +113,7 @@ func Search(q string, path string, k int) ([]uint32, error) {
 				// remove all finished seekers
 				seekers = slices.DeleteFunc(seekers, seeker.EOD)
 			}
-			results[i] = scores
+			results[i] = scores.List()
 			return nil
 		})
 	}
@@ -126,21 +122,16 @@ func Search(q string, path string, k int) ([]uint32, error) {
 		return []uint32{}, err
 	}
 
-	var scores []docInfo
+	scores := box.NewBox(MinDoc, k)
 	for _, res := range results {
-		scores = append(scores, res...)
+		scores.Add(res...)
 	}
 
-	slices.SortFunc(scores, func(a, b docInfo) int {
-		return int(a.score) - int(b.score)
-	})
-	scores = slicex.Cap(scores, k)
-	res := make([]uint32, len(scores))
-	for i := range scores {
-		res[i] = scores[i].id
+	resScore := scores.List()
+	res := make([]uint32, len(resScore))
+	for i := range resScore {
+		res[i] = resScore[i].id
 	}
 
-	// 	unisci le liste
-	// 	return the first k results
 	return res, nil
 }
