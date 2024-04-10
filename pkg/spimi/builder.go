@@ -75,12 +75,15 @@ func (b *builder) Encode(folderPath string) error {
 		return docFile.Close()
 	})
 
+	// TODO: in future the encode should be done in a single function (the freqs and posting info must be compressed)
+	terms := b.Lexicon.Terms()
+
 	wg.Go(func() error {
 		termFile, err := os.Create(path.Join(folderPath, "terms.bin"))
 		if err != nil {
 			return err
 		}
-		b.Lexicon.EncodeTerms(termFile)
+		b.Lexicon.EncodeTerms(termFile, terms)
 		return termFile.Close()
 	})
 
@@ -89,7 +92,7 @@ func (b *builder) Encode(folderPath string) error {
 		if err != nil {
 			return err
 		}
-		b.Lexicon.EncodePostings(postingFile)
+		b.Lexicon.EncodePostings(postingFile, terms)
 		return postingFile.Close()
 	})
 
@@ -98,7 +101,7 @@ func (b *builder) Encode(folderPath string) error {
 		if err != nil {
 			return err
 		}
-		b.Lexicon.EncodeFreqs(freqFile)
+		b.Lexicon.EncodeFreqs(freqFile, terms)
 		return freqFile.Close()
 	})
 

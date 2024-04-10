@@ -127,11 +127,10 @@ func Search(q string, path string, k int) ([]uint32, error) {
 		scores.Add(res...)
 	}
 
-	resScore := scores.List()
-	res := make([]uint32, len(resScore))
-	for i := range resScore {
-		res[i] = resScore[i].id
+	resIDs := make([]uint32, 0)
+	for _, doc := range scores.List() {
+		resIDs = append(resIDs, doc.id)
 	}
 
-	return res, nil
+	return resIDs, nil
 }

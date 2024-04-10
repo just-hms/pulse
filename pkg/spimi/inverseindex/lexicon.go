@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"encoding/binary"
 	"encoding/gob"
+	"fmt"
 	"io"
-	"slices"
 
 	"golang.org/x/exp/maps"
 )
@@ -22,15 +22,18 @@ func (l Lexicon) Clear() {
 	maps.Clear(l)
 }
 
-func (l Lexicon) EncodeTerms(w io.Writer) error {
+func (l Lexicon) Terms() []string {
+	return maps.Keys(l)
+}
+
+func (l Lexicon) EncodeTerms(w io.Writer, terms []string) error {
 	enc := gob.NewEncoder(w)
 	var cur uint32 = 0
 
-	terms := maps.Keys(l)
-	slices.Sort(terms)
-
 	for _, term := range terms {
 		lx := l[term]
+
+		fmt.Println(term, lx.DocFreq, len(lx.Posting), len(lx.Posting))
 
 		// TODO: specify the bit position in future
 		span := uint32(len(lx.Posting)) * 4
@@ -49,11 +52,9 @@ func (l Lexicon) EncodeTerms(w io.Writer) error {
 	return nil
 }
 
-func (l Lexicon) EncodePostings(w io.Writer) error {
+func (l Lexicon) EncodePostings(w io.Writer, terms []string) error {
 	enc := bufio.NewWriter(w)
-	// TODO: do this only one time
-	terms := maps.Keys(l)
-	slices.Sort(terms)
+	defer enc.Flush()
 
 	for _, term := range terms {
 		lx := l[term]
@@ -69,10 +70,9 @@ func (l Lexicon) EncodePostings(w io.Writer) error {
 	return nil
 }
 
-func (l Lexicon) EncodeFreqs(w io.Writer) error {
+func (l Lexicon) EncodeFreqs(w io.Writer, terms []string) error {
 	enc := bufio.NewWriter(w)
-	terms := maps.Keys(l)
-	slices.Sort(terms)
+	defer enc.Flush()
 
 	for _, term := range terms {
 		lx := l[term]
