@@ -33,7 +33,7 @@ func getDocScore(seekers []*seeker.Seeker) docInfo {
 	return docInfo{score: res, id: docID}
 }
 
-func Search(q string, path string, k int) ([]uint32, error) {
+func Search(q string, path string, k int) (inverseindex.Collection, error) {
 	tokens := preprocess.GetTokens(q)
 
 	partitions, err := os.ReadDir(path)
@@ -46,9 +46,6 @@ func Search(q string, path string, k int) ([]uint32, error) {
 
 	// 	launch the query for each partition
 	for i, partition := range partitions {
-
-		i := i
-		partition := partition
 
 		wg.Go(func() error {
 
@@ -76,7 +73,7 @@ func Search(q string, path string, k int) ([]uint32, error) {
 				}
 			}
 
-			docFile, err := os.Open(fmt.Sprintf("%s/doc.bin", filepath.Join(path, partition.Name())))
+			postingsFile, err := os.Open(fmt.Sprintf("%s/posting.bin", filepath.Join(path, partition.Name())))
 			if err != nil {
 				return err
 			}
@@ -88,7 +85,7 @@ func Search(q string, path string, k int) ([]uint32, error) {
 
 			seekers := make([]*seeker.Seeker, 0, len(terms))
 			for _, t := range terms {
-				s := seeker.NewSeeker(docFile, freqFile, t)
+				s := seeker.NewSeeker(postingsFile, freqFile, t)
 				s.Next()
 				seekers = append(seekers, s)
 			}
@@ -119,7 +116,7 @@ func Search(q string, path string, k int) ([]uint32, error) {
 	}
 
 	if err := wg.Wait(); err != nil {
-		return []uint32{}, err
+		return nil, err
 	}
 
 	scores := box.NewBox(MinDoc, k)
@@ -132,5 +129,33 @@ func Search(q string, path string, k int) ([]uint32, error) {
 		resIDs = append(resIDs, doc.id)
 	}
 
-	return resIDs, nil
+	docs := make(inverseindex.Collection, 0, len(tokens))
+
+	// TODO: merge docs index
+	for _, partition := range partitions {
+
+		docsFile, err := os.Open(fmt.Sprintf("%s/doc.bin", filepath.Join(path, partition.Name())))
+		if err != nil {
+			return nil, err
+		}
+
+		docsDecoder := gob.NewDecoder(docsFile)
+		// read the terms start and shit
+		for {
+			doc := inverseindex.Document{}
+			err := docsDecoder.Decode(&doc)
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				return nil, err
+			}
+
+			if slices.Contains(resIDs, doc.ID) {
+				docs = append(docs, doc)
+			}
+		}
+	}
+
+	return docs, nil
 }

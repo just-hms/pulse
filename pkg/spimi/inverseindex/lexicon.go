@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/binary"
 	"encoding/gob"
-	"fmt"
 	"io"
 
 	"golang.org/x/exp/maps"
@@ -32,8 +31,6 @@ func (l Lexicon) EncodeTerms(w io.Writer, terms []string) error {
 
 	for _, term := range terms {
 		lx := l[term]
-
-		fmt.Println(term, lx.DocFreq, len(lx.Posting), len(lx.Posting))
 
 		// TODO: specify the bit position in future
 		span := uint32(len(lx.Posting)) * 4

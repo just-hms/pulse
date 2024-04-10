@@ -21,8 +21,6 @@ func (c *Collection) Clear() {
 func (c *Collection) Encode(w io.Writer) {
 	enc := gob.NewEncoder(w)
 	for _, doc := range *c {
-		enc.Encode(doc.ID)
-		enc.Encode(doc.No)
-		enc.Encode(doc.Len)
+		enc.Encode(doc)
 	}
 }
