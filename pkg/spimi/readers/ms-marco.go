@@ -6,10 +6,10 @@ import (
 	"log"
 	"strings"
 
-	"github.com/just-hms/pulse/pkg/spimi/spimireader"
+	"github.com/just-hms/pulse/pkg/spimi"
 )
 
-var _ spimireader.Chunk = &msMarco{}
+var _ spimi.ChunkReader = &msMarco{}
 
 type msMarco struct {
 	chunkSize int
@@ -24,8 +24,8 @@ func NewMsMarco(r *bufio.Reader, chunkSize int) *msMarco {
 }
 
 // Read implements index.ChunkReader.
-func (r *msMarco) Read() ([]spimireader.Document, error) {
-	res := make([]spimireader.Document, r.chunkSize)
+func (r *msMarco) Read() ([]spimi.Document, error) {
+	res := make([]spimi.Document, r.chunkSize)
 
 	for i := 0; i < r.chunkSize; i++ {
 		s, err := r.reader.ReadString('\n')
@@ -41,7 +41,7 @@ func (r *msMarco) Read() ([]spimireader.Document, error) {
 			log.Fatalf("'%s' is malformed\n", strings.TrimSpace(s))
 		}
 
-		res[i] = spimireader.Document{
+		res[i] = spimi.Document{
 			No:      sPlitted[0],
 			Content: strings.TrimSpace(sPlitted[1]),
 		}

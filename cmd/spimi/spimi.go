@@ -7,8 +7,8 @@ import (
 	"os"
 	"runtime/pprof"
 
-	"github.com/just-hms/pulse/pkg/readers"
 	"github.com/just-hms/pulse/pkg/spimi"
+	"github.com/just-hms/pulse/pkg/spimi/readers"
 )
 
 var cpuprofile = flag.Bool("profile", false, "write cpu profile to \"data/cpu.prof\"")

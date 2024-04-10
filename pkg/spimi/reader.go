@@ -1,4 +1,4 @@
-package spimireader
+package spimi
 
 type ChunkReader interface {
 	Read() ([]Document, error)

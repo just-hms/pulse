@@ -7,11 +7,10 @@ import (
 
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
-	"github.com/just-hms/pulse/pkg/spimi/spimireader"
 )
 
-func Parse(r spimireader.Chunk, numWorkers int, path string) error {
-	chunksQueue := make(chan []spimireader.Document, numWorkers)
+func Parse(r ChunkReader, numWorkers int, path string) error {
+	chunksQueue := make(chan []Document, numWorkers)
 	consumerAvailable := make(chan bool, numWorkers)
 
 	errChan := make(chan error, 1)
