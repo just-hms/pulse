@@ -42,43 +42,49 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 	}
 	var wg errgroup.Group
 
+	terms := make([]inverseindex.Term, 0, len(tokens))
+
+	termsFile, err := os.Open(filepath.Join(path, "terms.bin"))
+	if err != nil {
+		return nil, err
+	}
+
+	termDecoder := gob.NewDecoder(termsFile)
+	// read the terms start and shit
+	for {
+		t := inverseindex.Term{}
+		err := termDecoder.Decode(&t)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		if slices.Contains(tokens, t.Value) {
+			terms = append(terms, t)
+		}
+	}
+
 	results := make([][]docInfo, len(partitions))
 
 	// 	launch the query for each partition
 	for i, partition := range partitions {
 
+		if !partition.IsDir() {
+			continue
+		}
+
 		wg.Go(func() error {
 
-			terms := make([]inverseindex.Term, 0, len(tokens))
+			folder := filepath.Join(path, partition.Name())
 
-			termsFile, err := os.Open(fmt.Sprintf("%s/terms.bin", filepath.Join(path, partition.Name())))
+			postingsFile, err := os.Open(filepath.Join(folder, "posting.bin"))
 			if err != nil {
 				return err
 			}
 
-			termDecoder := gob.NewDecoder(termsFile)
-			// read the terms start and shit
-			for {
-				t := inverseindex.Term{}
-				err := termDecoder.Decode(&t)
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				if err != nil {
-					return err
-				}
-
-				if slices.Contains(tokens, t.Value) {
-					terms = append(terms, t)
-				}
-			}
-
-			postingsFile, err := os.Open(fmt.Sprintf("%s/posting.bin", filepath.Join(path, partition.Name())))
-			if err != nil {
-				return err
-			}
-
-			freqFile, err := os.Open(fmt.Sprintf("%s/freqs.bin", filepath.Join(path, partition.Name())))
+			freqFile, err := os.Open(filepath.Join(folder, "freqs.bin"))
 			if err != nil {
 				return err
 			}
@@ -133,6 +139,10 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 
 	// TODO: merge docs index
 	for _, partition := range partitions {
+
+		if !partition.IsDir() {
+			continue
+		}
 
 		docsFile, err := os.Open(fmt.Sprintf("%s/doc.bin", filepath.Join(path, partition.Name())))
 		if err != nil {

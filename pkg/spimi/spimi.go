@@ -1,7 +1,11 @@
 package spimi
 
 import (
+	"encoding/gob"
+	"os"
+	"path/filepath"
 	"runtime"
+	"slices"
 	"sync"
 	"time"
 
@@ -31,7 +35,7 @@ func Parse(r ChunkReader, numWorkers int, path string) error {
 					// for every chunk
 
 					tokens := preprocess.GetTokens(doc.Content)
-					freqs := make(map[string]uint32, 100)
+					freqs := make(map[string]uint32, len(tokens)/2)
 					for _, term := range tokens {
 						if _, ok := freqs[term]; !ok {
 							freqs[term] = 1
@@ -73,12 +77,12 @@ func Parse(r ChunkReader, numWorkers int, path string) error {
 
 	sleep := 10 * time.Second
 	for {
-		var ok = true
+		var working = true
 		select {
 		case err := <-errChan:
 			return err
-		case _, ok = <-chunksQueue:
-			if ok {
+		case _, working = <-chunksQueue:
+			if working {
 				time.Sleep(sleep)
 			} else {
 				wg.Wait()
@@ -88,7 +92,7 @@ func Parse(r ChunkReader, numWorkers int, path string) error {
 		}
 
 		runtime.ReadMemStats(&memStats)
-		if memStats.Alloc < memoryThreshold && ok {
+		if memStats.Alloc < memoryThreshold && working {
 			continue
 		}
 
@@ -97,8 +101,56 @@ func Parse(r ChunkReader, numWorkers int, path string) error {
 			return err
 		}
 
-		if !ok {
+		if !working {
 			break
+		}
+	}
+
+	return nil
+}
+
+func Merge(path string) error {
+	partitions, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+
+	// TODO: maybe do this without keeping everything in memory
+	// TODO: add a "global term" which doesn't have local indexes information
+	res := []inverseindex.Term{}
+	for _, partition := range partitions {
+		folder := filepath.Join(path, partition.Name())
+		f, err := os.Open(filepath.Join(folder, "terms.bin"))
+		if err != nil {
+			return err
+		}
+
+		reader := gob.NewDecoder(f)
+
+		t := inverseindex.Term{}
+		reader.Decode(&t)
+		res = append(res, t)
+	}
+	slices.SortFunc(res, func(a, b inverseindex.Term) int {
+		if a.Value == b.Value {
+			return 0
+		}
+		if a.Value < b.Value {
+			return -1
+		}
+		return 1
+	})
+
+	f, err := os.Create(filepath.Join(path, "terms.bin"))
+	if err != nil {
+		return err
+	}
+	encoder := gob.NewEncoder(f)
+
+	for _, t := range res {
+		err := encoder.Encode(t)
+		if err != nil {
+			return err
 		}
 	}
 

@@ -48,4 +48,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	err = spimi.Merge("data/dump")
+	if err != nil {
+		panic(err)
+	}
 }
