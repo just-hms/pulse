@@ -7,12 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"sync"
 	"time"
 
+	iradix "github.com/hashicorp/go-immutable-radix/v2"
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
+	"github.com/just-hms/pulse/pkg/structures/withkey"
 )
 
 func Parse(r ChunkReader, numWorkers int, path string) error {
@@ -117,9 +118,7 @@ func Merge(path string) error {
 		return err
 	}
 
-	// TODO: maybe do this without keeping everything in memory
-	// TODO: add a "global term" which doesn't have local indexes information
-	res := []inverseindex.Term{}
+	lexicon := iradix.New[*inverseindex.GlobalTerm]()
 	for _, partition := range partitions {
 		if !partition.IsDir() {
 			continue
@@ -133,7 +132,7 @@ func Merge(path string) error {
 		reader := gob.NewDecoder(f)
 
 		for {
-			t := inverseindex.Term{}
+			t := withkey.WithKey[inverseindex.LocalTerm]{}
 			err = reader.Decode(&t)
 			if errors.Is(err, io.EOF) {
 				break
@@ -141,18 +140,21 @@ func Merge(path string) error {
 			if err != nil {
 				return err
 			}
-			res = append(res, t)
+
+			key := []byte(t.Key)
+			v, ok := lexicon.Get(key)
+
+			if ok {
+				v.DocFreq += t.Value.DocFreq
+			} else {
+				lexicon, _, _ = lexicon.Insert(key, &inverseindex.GlobalTerm{
+					DocFreq: t.Value.DocFreq,
+				})
+			}
 		}
 	}
-	slices.SortFunc(res, func(a, b inverseindex.Term) int {
-		if a.Value == b.Value {
-			return 0
-		}
-		if a.Value < b.Value {
-			return -1
-		}
-		return 1
-	})
+
+	it := lexicon.Root().Iterator()
 
 	f, err := os.Create(filepath.Join(path, "terms.bin"))
 	if err != nil {
@@ -160,8 +162,13 @@ func Merge(path string) error {
 	}
 	encoder := gob.NewEncoder(f)
 
-	for _, t := range res {
-		err := encoder.Encode(t)
+	// TODO: refactor inverseindex.GlobalTermWithKey
+
+	for key, t, ok := it.Next(); ok; key, _, ok = it.Next() {
+		err := encoder.Encode(withkey.WithKey[*inverseindex.GlobalTerm]{
+			Key:   string(key),
+			Value: t,
+		})
 		if err != nil {
 			return err
 		}

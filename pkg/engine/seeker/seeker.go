@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
+	"github.com/just-hms/pulse/pkg/structures/withkey"
 )
 
 type Seeker struct {
@@ -19,12 +20,12 @@ type Seeker struct {
 	term string
 }
 
-func NewSeeker(docFile, freqFile *os.File, t inverseindex.Term) *Seeker {
+func NewSeeker(docFile, freqFile *os.File, t withkey.WithKey[inverseindex.LocalTerm]) *Seeker {
 	return &Seeker{
-		term:     t.Value,
-		start:    int64(t.StartOffset),
-		pos:      int64(t.StartOffset),
-		end:      int64(t.EndOffset),
+		term:     t.Key,
+		start:    int64(t.Value.StartOffset),
+		pos:      int64(t.Value.StartOffset),
+		end:      int64(t.Value.EndOffset),
 		docFile:  docFile,
 		freqFile: freqFile,
 	}

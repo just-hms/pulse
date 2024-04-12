@@ -9,11 +9,13 @@ import (
 	"path/filepath"
 	"slices"
 
+	iradix "github.com/hashicorp/go-immutable-radix/v2"
 	"github.com/just-hms/pulse/pkg/engine/seeker"
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
 	"github.com/just-hms/pulse/pkg/structures/box"
 	"github.com/just-hms/pulse/pkg/structures/slicex"
+	"github.com/just-hms/pulse/pkg/structures/withkey"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -33,6 +35,28 @@ func getDocScore(seekers []*seeker.Seeker) docInfo {
 	return docInfo{score: res, id: docID}
 }
 
+func getLexicon[T any](reader io.Reader) (*iradix.Tree[T], error) {
+
+	lexicon := iradix.New[T]().Txn()
+
+	termDecoder := gob.NewDecoder(reader)
+	// read the terms start and shit
+	for {
+		t := withkey.WithKey[T]{}
+		err := termDecoder.Decode(&t)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		lexicon.Insert([]byte(t.Key), t.Value)
+	}
+
+	return lexicon.Commit(), nil
+}
+
 func Search(q string, path string, k int) (inverseindex.Collection, error) {
 	tokens := preprocess.GetTokens(q)
 
@@ -42,27 +66,23 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 	}
 	var wg errgroup.Group
 
-	terms := make([]inverseindex.Term, 0, len(tokens))
-
 	termsFile, err := os.Open(filepath.Join(path, "terms.bin"))
 	if err != nil {
 		return nil, err
 	}
 
-	termDecoder := gob.NewDecoder(termsFile)
-	// read the terms start and shit
-	for {
-		t := inverseindex.Term{}
-		err := termDecoder.Decode(&t)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
+	globalLexicon, err := getLexicon[inverseindex.GlobalTerm](termsFile)
+	if err != nil {
+		return nil, err
+	}
 
-		if slices.Contains(tokens, t.Value) {
-			terms = append(terms, t)
+	globalTerms := make([]withkey.WithKey[inverseindex.GlobalTerm], 0)
+	for _, token := range tokens {
+		if t, ok := globalLexicon.Get([]byte(token)); ok {
+			globalTerms = append(globalTerms, withkey.WithKey[inverseindex.GlobalTerm]{
+				Key:   token,
+				Value: t,
+			})
 		}
 	}
 
@@ -79,6 +99,26 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 
 			folder := filepath.Join(path, partition.Name())
 
+			termsFile, err := os.Open(filepath.Join(path, "terms.bin"))
+			if err != nil {
+				return err
+			}
+
+			localLexicon, err := getLexicon[inverseindex.LocalTerm](termsFile)
+			if err != nil {
+				return err
+			}
+
+			localTerms := make([]withkey.WithKey[inverseindex.LocalTerm], 0)
+			for _, gTerm := range globalTerms {
+				if t, ok := localLexicon.Get([]byte(gTerm.Key)); ok {
+					localTerms = append(localTerms, withkey.WithKey[inverseindex.LocalTerm]{
+						Key:   gTerm.Key,
+						Value: t,
+					})
+				}
+			}
+
 			postingsFile, err := os.Open(filepath.Join(folder, "posting.bin"))
 			if err != nil {
 				return err
@@ -88,9 +128,8 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 			if err != nil {
 				return err
 			}
-
-			seekers := make([]*seeker.Seeker, 0, len(terms))
-			for _, t := range terms {
+			seekers := make([]*seeker.Seeker, 0, len(localTerms))
+			for _, t := range localTerms {
 				s := seeker.NewSeeker(postingsFile, freqFile, t)
 				s.Next()
 				seekers = append(seekers, s)

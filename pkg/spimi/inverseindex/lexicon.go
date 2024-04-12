@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"io"
 
+	"github.com/just-hms/pulse/pkg/structures/withkey"
 	"golang.org/x/exp/maps"
 )
 
@@ -34,11 +35,15 @@ func (l Lexicon) EncodeTerms(w io.Writer, terms []string) error {
 
 		// TODO: specify the bit position in future
 		span := uint32(len(lx.Posting)) * 4
-		t := Term{
-			Value:       term,
-			DocFreq:     lx.DocFreq,
-			StartOffset: cur,
-			EndOffset:   cur + span,
+		t := withkey.WithKey[LocalTerm]{
+			Key: term,
+			Value: LocalTerm{
+				GlobalTerm: GlobalTerm{
+					DocFreq: lx.DocFreq,
+				},
+				StartOffset: cur,
+				EndOffset:   cur + span,
+			},
 		}
 
 		if err := enc.Encode(t); err != nil {
