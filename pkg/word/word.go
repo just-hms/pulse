@@ -54,12 +54,12 @@ func Stem(tokens []string) {
 	wg := sync.WaitGroup{}
 	wg.Add(len(tokens))
 	for i, t := range tokens {
-		go func(i int, t string) {
+		go func() {
 			defer wg.Done()
 			tokens[i] = string(
 				porterstemmer.StemWithoutLowerCasing([]rune(t)),
 			)
-		}(i, t)
+		}()
 	}
 
 	wg.Wait()
