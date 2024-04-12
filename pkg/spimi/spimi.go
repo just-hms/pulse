@@ -2,6 +2,8 @@ package spimi
 
 import (
 	"encoding/gob"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -119,6 +121,9 @@ func Merge(path string) error {
 	// TODO: add a "global term" which doesn't have local indexes information
 	res := []inverseindex.Term{}
 	for _, partition := range partitions {
+		if !partition.IsDir() {
+			continue
+		}
 		folder := filepath.Join(path, partition.Name())
 		f, err := os.Open(filepath.Join(folder, "terms.bin"))
 		if err != nil {
@@ -127,9 +132,17 @@ func Merge(path string) error {
 
 		reader := gob.NewDecoder(f)
 
-		t := inverseindex.Term{}
-		reader.Decode(&t)
-		res = append(res, t)
+		for {
+			t := inverseindex.Term{}
+			err = reader.Decode(&t)
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				return err
+			}
+			res = append(res, t)
+		}
 	}
 	slices.SortFunc(res, func(a, b inverseindex.Term) int {
 		if a.Value == b.Value {

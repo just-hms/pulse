@@ -39,18 +39,15 @@ func main() {
 
 	r := readers.NewMsMarco(bufio.NewReader(f), 50_000)
 
-	err := os.RemoveAll("data/dump")
-	if err != nil {
+	if err := os.RemoveAll("data/dump"); err != nil {
 		panic(err)
 	}
 
-	err = spimi.Parse(r, 16, "data/dump")
-	if err != nil {
+	if err := spimi.Parse(r, 16, "data/dump"); err != nil {
 		panic(err)
 	}
 
-	err = spimi.Merge("data/dump")
-	if err != nil {
+	if err := spimi.Merge("data/dump"); err != nil {
 		panic(err)
 	}
 }
