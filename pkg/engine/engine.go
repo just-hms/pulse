@@ -29,6 +29,7 @@ func MinDoc(a, b docInfo) int { return int(a.score) - int(b.score) }
 func getDocScore(seekers []*seeker.Seeker) docInfo {
 	res := 0.0
 	docID := seekers[0].ID
+	// TODO: start with tfidf
 	for _, s := range seekers {
 		res += float64(s.Freq)
 	}
@@ -176,7 +177,7 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 
 	docs := make(inverseindex.Collection, 0, len(tokens))
 
-	// TODO: merge docs index
+	// TODO: access docs by ID (which in incremental)
 	for _, partition := range partitions {
 
 		if !partition.IsDir() {
