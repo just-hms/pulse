@@ -35,7 +35,7 @@ func (l Lexicon) EncodeTerms(w io.Writer, terms iter.Seq[string]) error {
 	for term := range terms {
 		lx := l[term]
 
-		// TODO: specify the bit position in future
+		// todo: specify the bit position in future
 		span := uint32(len(lx.Posting)) * 4
 		t := withkey.WithKey[LocalTerm]{
 			Key: term,

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/just-hms/pulse/pkg/engine/config"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
 	"golang.org/x/sync/errgroup"
 )
@@ -16,22 +17,23 @@ type builder struct {
 	Collection inverseindex.Collection
 	mu         sync.Mutex
 
-	docCounter  uint32
+	nextDocID   uint32
 	dumpCounter uint32
 }
 
 func newBuilder() *builder {
 	return &builder{
-		Lexicon: make(inverseindex.Lexicon),
+		Lexicon:     make(inverseindex.Lexicon),
+		Collection:  []inverseindex.Document{},
+		mu:          sync.Mutex{},
+		nextDocID:   0,
+		dumpCounter: 0,
 	}
 }
 
 func (b *builder) Add(freqs map[string]uint32, doc inverseindex.Document) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-
-	doc.ID = b.docCounter
-	b.docCounter++
 
 	b.Collection = append(b.Collection, doc)
 
@@ -45,9 +47,11 @@ func (b *builder) Add(freqs map[string]uint32, doc inverseindex.Document) {
 
 		lx := b.Lexicon[term]
 		lx.DocFreq += freq
-		lx.Posting = append(lx.Posting, doc.ID)
+		lx.Posting = append(lx.Posting, b.nextDocID)
 		lx.Frequencies = append(lx.Frequencies, freq)
 	}
+	b.nextDocID++
+
 }
 
 func (b *builder) Encode(path string) error {
@@ -76,7 +80,7 @@ func (b *builder) Encode(path string) error {
 		return docFile.Close()
 	})
 
-	// TODO: in future the encode should be done in a single function (the freqs and posting info must be compressed)
+	// todo: in future the encode should be done in a single function (the freqs and posting info must be compressed)
 	terms := b.Lexicon.Terms()
 
 	wg.Go(func() error {
@@ -110,19 +114,25 @@ func (b *builder) Encode(path string) error {
 		return err
 	}
 
-	statsFile, err := os.OpenFile(filepath.Join(path, "stats.bin"), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-	if err != nil {
-		return err
+	// write down at which document we arrived
+	{
+		statsFile, err := os.OpenFile(filepath.Join(path, "stats.bin"), os.O_RDWR|os.O_CREATE, 0600)
+		if err != nil {
+			return err
+		}
+
+		c, _ := config.Load(statsFile)
+		c.Partitions = append(c.Partitions, b.nextDocID-1)
+
+		err = c.Dump(statsFile)
+		if err != nil {
+			return err
+		}
+
+		defer statsFile.Close()
 	}
 
-	_, err = statsFile.WriteString(fmt.Sprintf("%d\n", b.docCounter))
-	if err != nil {
-		return err
-	}
-
-	defer statsFile.Close()
-
-	// make this better
+	// make this better, maybe use a double buffer
 	b.Lexicon.Clear()
 	b.Collection.Clear()
 	return nil

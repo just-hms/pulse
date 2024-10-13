@@ -1,11 +1,13 @@
 package box
 
+import "slices"
+
 type CmpFunc[T any] func(a, b T) int
 
 type Box[T any] interface {
 	Add(el ...T)
 	Size() int
-	List() []T
+	Values() []T
 }
 
 var _ Box[int] = &box[int]{}
@@ -45,7 +47,8 @@ func (b *box[T]) Add(els ...T) {
 }
 
 // List given a box returns a list
-func (b *box[T]) List() []T {
+func (b *box[T]) Values() []T {
+	slices.SortFunc(b.content, b.cmp)
 	return b.content
 }
 

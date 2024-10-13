@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -20,21 +21,22 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type docInfo struct {
-	score float64
-	id    uint32
+type DocInfo struct {
+	Document *inverseindex.Document
+	Score    float64
+	ID       uint32
 }
 
-func MinDoc(a, b docInfo) int { return int(a.score) - int(b.score) }
+func MinDoc(a, b *DocInfo) int { return int(a.Score) - int(b.Score) }
 
-func getDocScore(seekers []*seeker.Seeker) docInfo {
+func getDocScore(seekers []*seeker.Seeker) *DocInfo {
 	res := 0.0
 	docID := seekers[0].ID
-	// TODO: start with tfidf
+	// todo: start with tfidf
 	for _, s := range seekers {
 		res += float64(s.Freq)
 	}
-	return docInfo{score: res, id: docID}
+	return &DocInfo{Score: res, ID: docID}
 }
 
 func getLexicon[T any](reader io.Reader) (*iradix.Tree[T], error) {
@@ -59,14 +61,13 @@ func getLexicon[T any](reader io.Reader) (*iradix.Tree[T], error) {
 	return lexicon.Commit(), nil
 }
 
-func Search(q string, path string, k int) (inverseindex.Collection, error) {
-	tokens := preprocess.GetTokens(q)
+func Search(query string, path string, k int) ([]*DocInfo, error) {
+	qTokens := preprocess.GetTokens(query)
 
 	partitions, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
-	var wg errgroup.Group
 
 	termsFile, err := os.Open(filepath.Join(path, "terms.bin"))
 	if err != nil {
@@ -78,24 +79,18 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 		return nil, err
 	}
 
-	globalTerms := make([]withkey.WithKey[inverseindex.GlobalTerm], 0)
-	for _, token := range tokens {
-		if t, ok := globalLexicon.Get([]byte(token)); ok {
-			globalTerms = append(globalTerms, withkey.WithKey[inverseindex.GlobalTerm]{
-				Key:   token,
+	qGlobalTerms := make([]withkey.WithKey[inverseindex.GlobalTerm], 0)
+	for _, qToken := range qTokens {
+		if t, ok := globalLexicon.Get([]byte(qToken)); ok {
+			qGlobalTerms = append(qGlobalTerms, withkey.WithKey[inverseindex.GlobalTerm]{
+				Key:   qToken,
 				Value: t,
 			})
 		}
 	}
 
-	stats, err := config.Load(path)
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println(stats)
-
-	results := make([][]docInfo, len(partitions))
+	var wg errgroup.Group
+	results := make([][]*DocInfo, len(partitions))
 
 	// 	launch the query for each partition
 	for i, partition := range partitions {
@@ -118,11 +113,11 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 				return err
 			}
 
-			localTerms := make([]withkey.WithKey[inverseindex.LocalTerm], 0)
-			for _, gTerm := range globalTerms {
-				if t, ok := localLexicon.Get([]byte(gTerm.Key)); ok {
-					localTerms = append(localTerms, withkey.WithKey[inverseindex.LocalTerm]{
-						Key:   gTerm.Key,
+			qLocalTerms := make([]withkey.WithKey[inverseindex.LocalTerm], 0)
+			for _, qTerm := range qGlobalTerms {
+				if t, ok := localLexicon.Get([]byte(qTerm.Key)); ok {
+					qLocalTerms = append(qLocalTerms, withkey.WithKey[inverseindex.LocalTerm]{
+						Key:   qTerm.Key,
 						Value: t,
 					})
 				}
@@ -136,8 +131,8 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 			if err != nil {
 				return err
 			}
-			seekers := make([]*seeker.Seeker, 0, len(localTerms))
-			for _, t := range localTerms {
+			seekers := make([]*seeker.Seeker, 0, len(qLocalTerms))
+			for _, t := range qLocalTerms {
 				s := seeker.NewSeeker(postingsFile, freqFile, t)
 				s.Next()
 				seekers = append(seekers, s)
@@ -163,7 +158,7 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 				// remove all finished seekers
 				seekers = slices.DeleteFunc(seekers, seeker.EOD)
 			}
-			results[i] = scores.List()
+			results[i] = scores.Values()
 			return nil
 		})
 	}
@@ -177,42 +172,57 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 		scores.Add(res...)
 	}
 
-	resIDs := make([]uint32, 0)
-	for _, doc := range scores.List() {
-		resIDs = append(resIDs, doc.id)
+	res := scores.Values()
+
+	err = filldocs(partitions, path, res)
+	if err != nil {
+		return nil, err
 	}
 
-	docs := make(inverseindex.Collection, 0, len(tokens))
+	return res, nil
+}
 
-	// TODO: access docs by ID (which in incremental)
-	for _, partition := range partitions {
+func filldocs(partitions []fs.DirEntry, path string, toClone []*DocInfo) error {
+	statsFile, err := os.Open(filepath.Join(path, "stats.bin"))
+	if err != nil {
+		return err
+	}
+	defer statsFile.Close()
 
-		if !partition.IsDir() {
+	cfg, err := config.Load(statsFile)
+	if err != nil {
+		return err
+	}
+	docInfos := slices.Clone(toClone)
+	slices.SortFunc(docInfos, func(a, b *DocInfo) int { return int(a.ID) - int(b.ID) })
+
+	i := 0
+	docsByPartition := make([][]*DocInfo, len(partitions))
+	for _, doc := range docInfos {
+		// todo: test off by one
+		if doc.ID <= cfg.Partitions[i] {
+			docsByPartition[i] = append(docsByPartition[i], doc)
+		} else {
+			i++
+		}
+	}
+
+	for i, partitionDocs := range docsByPartition {
+
+		if !partitions[i].IsDir() {
 			continue
 		}
 
-		docsFile, err := os.Open(fmt.Sprintf("%s/doc.bin", filepath.Join(path, partition.Name())))
+		docsFile, err := os.Open(fmt.Sprintf("%s/doc.bin", filepath.Join(path, partitions[i].Name())))
 		if err != nil {
-			return nil, err
+			return err
 		}
-
-		docsDecoder := gob.NewDecoder(docsFile)
-		// read the terms start and shit
-		for {
-			doc := inverseindex.Document{}
-			err := docsDecoder.Decode(&doc)
-			if errors.Is(err, io.EOF) {
-				break
-			}
+		for _, doc := range partitionDocs {
+			err := inverseindex.DecodeDocument(doc.ID, docsFile, doc.Document)
 			if err != nil {
-				return nil, err
-			}
-
-			if slices.Contains(resIDs, doc.ID) {
-				docs = append(docs, doc)
+				return err
 			}
 		}
 	}
-
-	return docs, nil
+	return nil
 }

@@ -14,35 +14,35 @@ type Seeker struct {
 
 	ID              uint32
 	Freq            uint32
-	start, pos, end int64
+	start, pos, end uint32
 
-	// for debugging only
+	// debugging purpose, will probably be removed
 	term string
 }
 
 func NewSeeker(docFile, freqFile *os.File, t withkey.WithKey[inverseindex.LocalTerm]) *Seeker {
 	return &Seeker{
 		term:     t.Key,
-		start:    int64(t.Value.StartOffset),
-		pos:      int64(t.Value.StartOffset),
-		end:      int64(t.Value.EndOffset),
+		start:    t.Value.StartOffset,
+		pos:      t.Value.StartOffset,
+		end:      t.Value.EndOffset,
 		docFile:  docFile,
 		freqFile: freqFile,
 	}
 }
 
 func (s *Seeker) Next() {
-	s.docFile.Seek(s.pos, 0)
+	s.docFile.Seek(int64(s.pos), 0)
 	if err := binary.Read(s.docFile, binary.LittleEndian, &s.ID); err != nil {
 		panic(fmt.Sprintf("seeker: %v, while reading docs, with error: %v", s, err))
 	}
 
-	s.freqFile.Seek(s.pos, 0)
+	s.freqFile.Seek(int64(s.pos), 0)
 	if err := binary.Read(s.freqFile, binary.LittleEndian, &s.Freq); err != nil {
 		panic(fmt.Sprintf("seeker: %v, while reading freqs, with error: %v", s, err))
 	}
 
-	// TODO: specify bit position in future
+	// : specify bit position in future
 	s.pos += 4
 }
 
@@ -50,7 +50,7 @@ func (s *Seeker) String() string {
 	return fmt.Sprintf("{%s %d:%d:%d}", s.term, s.start, s.pos, s.end)
 }
 
-// EOD end of docs, return true if the seekers have seeked to the end of the term's documents
+// EOD (end of docs) returns true if the seeker have reached the end of the term's document
 func EOD(s *Seeker) bool {
 	return s.pos > s.end
 }

@@ -2,7 +2,7 @@ package slicex
 
 func MinsFunc[S ~[]E, E any](x S, cmp func(a, b E) int) []E {
 	if len(x) < 1 {
-		panic("slicex.MinsFunc: empty list")
+		return []E{}
 	}
 
 	// get the minumum value
@@ -25,4 +25,14 @@ func MinsFunc[S ~[]E, E any](x S, cmp func(a, b E) int) []E {
 
 func Cap[S ~[]E, E any](x S, maxlen int) S {
 	return x[:min(len(x), maxlen)]
+}
+
+func Flatten[S ~[]E, E any](input []S) []E {
+	var result []E
+
+	for _, row := range input {
+		result = append(result, row...)
+	}
+
+	return result
 }

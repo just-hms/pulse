@@ -36,7 +36,6 @@ func Parse(r ChunkReader, numWorkers int, path string) error {
 
 				for _, doc := range chunk {
 					// for every chunk
-
 					tokens := preprocess.GetTokens(doc.Content)
 					freqs := make(map[string]uint32, len(tokens)/2)
 					for _, term := range tokens {
@@ -47,10 +46,7 @@ func Parse(r ChunkReader, numWorkers int, path string) error {
 						}
 					}
 
-					b.Add(freqs, inverseindex.Document{
-						No:  doc.No,
-						Len: len(doc.Content),
-					})
+					b.Add(freqs, inverseindex.NewDocument(doc.No, len(doc.Content)))
 				}
 				consumerAvailable <- true
 			}
@@ -112,13 +108,14 @@ func Parse(r ChunkReader, numWorkers int, path string) error {
 	return nil
 }
 
+// todo: check merge
 func Merge(path string) error {
 	partitions, err := os.ReadDir(path)
 	if err != nil {
 		return err
 	}
 
-	lexicon := iradix.New[*inverseindex.GlobalTerm]()
+	lexicon := iradix.New[*inverseindex.GlobalTerm]().Txn()
 	for _, partition := range partitions {
 		if !partition.IsDir() {
 			continue
@@ -142,25 +139,24 @@ func Merge(path string) error {
 			}
 
 			key := []byte(t.Key)
-			v, ok := lexicon.Get(key)
 
-			if ok {
+			if v, ok := lexicon.Get(key); ok {
 				v.DocFreq += t.Value.DocFreq
 			} else {
-				lexicon, _, _ = lexicon.Insert(key, &inverseindex.GlobalTerm{
+				lexicon.Insert(key, &inverseindex.GlobalTerm{
 					DocFreq: t.Value.DocFreq,
 				})
 			}
 		}
 	}
 
-	it := lexicon.Root().Iterator()
-
 	f, err := os.Create(filepath.Join(path, "terms.bin"))
 	if err != nil {
 		return err
 	}
 	encoder := gob.NewEncoder(f)
+
+	it := lexicon.Commit().Root().Iterator()
 
 	for key, t, ok := it.Next(); ok; key, _, ok = it.Next() {
 		err := encoder.Encode(withkey.WithKey[*inverseindex.GlobalTerm]{

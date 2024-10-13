@@ -31,5 +31,5 @@ func TestBoxAdd(t *testing.T) {
 
 	// Verify content
 	exp := []int{1, 2, 3}
-	req.Equal(exp, b.List())
+	req.Equal(exp, b.Values())
 }
