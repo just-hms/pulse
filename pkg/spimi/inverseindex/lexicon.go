@@ -62,10 +62,8 @@ func (l Lexicon) EncodePostings(w io.Writer, terms iter.Seq[string]) error {
 
 	for term := range terms {
 		lx := l[term]
-		buf := make([]byte, 4)
 		for _, p := range lx.Posting {
-			binary.LittleEndian.PutUint32(buf, p)
-			_, err := enc.Write(buf)
+			err := binary.Write(enc, binary.LittleEndian, p)
 			if err != nil {
 				return err
 			}
@@ -80,10 +78,8 @@ func (l Lexicon) EncodeFreqs(w io.Writer, terms iter.Seq[string]) error {
 
 	for term := range terms {
 		lx := l[term]
-		buf := make([]byte, 4)
 		for _, p := range lx.Frequencies {
-			binary.LittleEndian.PutUint32(buf, p)
-			_, err := enc.Write(buf)
+			err := binary.Write(enc, binary.LittleEndian, p)
 			if err != nil {
 				return err
 			}

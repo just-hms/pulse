@@ -22,7 +22,7 @@ import (
 )
 
 type DocInfo struct {
-	Document *inverseindex.Document
+	Document inverseindex.Document
 	Score    float64
 	ID       uint32
 }
@@ -218,8 +218,7 @@ func filldocs(partitions []fs.DirEntry, path string, toClone []*DocInfo) error {
 			return err
 		}
 		for _, doc := range partitionDocs {
-			err := inverseindex.DecodeDocument(doc.ID, docsFile, doc.Document)
-			if err != nil {
+			if err := doc.Document.Decode(doc.ID, docsFile); err != nil {
 				return err
 			}
 		}

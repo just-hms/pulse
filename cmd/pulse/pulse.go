@@ -38,5 +38,7 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println(res)
+	for _, doc := range res {
+		fmt.Println(string(doc.Document.No[:]))
+	}
 }
