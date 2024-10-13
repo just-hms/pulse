@@ -5,9 +5,11 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"io"
+	"iter"
+
+	"maps"
 
 	"github.com/just-hms/pulse/pkg/structures/withkey"
-	"golang.org/x/exp/maps"
 )
 
 type Lexicon map[string]*LexVal
@@ -19,18 +21,18 @@ type LexVal struct {
 }
 
 func (l Lexicon) Clear() {
-	maps.Clear(l)
+	clear(l)
 }
 
-func (l Lexicon) Terms() []string {
+func (l Lexicon) Terms() iter.Seq[string] {
 	return maps.Keys(l)
 }
 
-func (l Lexicon) EncodeTerms(w io.Writer, terms []string) error {
+func (l Lexicon) EncodeTerms(w io.Writer, terms iter.Seq[string]) error {
 	enc := gob.NewEncoder(w)
 	var cur uint32 = 0
 
-	for _, term := range terms {
+	for term := range terms {
 		lx := l[term]
 
 		// TODO: specify the bit position in future
@@ -54,11 +56,11 @@ func (l Lexicon) EncodeTerms(w io.Writer, terms []string) error {
 	return nil
 }
 
-func (l Lexicon) EncodePostings(w io.Writer, terms []string) error {
+func (l Lexicon) EncodePostings(w io.Writer, terms iter.Seq[string]) error {
 	enc := bufio.NewWriter(w)
 	defer enc.Flush()
 
-	for _, term := range terms {
+	for term := range terms {
 		lx := l[term]
 		buf := make([]byte, 4)
 		for _, p := range lx.Posting {
@@ -72,11 +74,11 @@ func (l Lexicon) EncodePostings(w io.Writer, terms []string) error {
 	return nil
 }
 
-func (l Lexicon) EncodeFreqs(w io.Writer, terms []string) error {
+func (l Lexicon) EncodeFreqs(w io.Writer, terms iter.Seq[string]) error {
 	enc := bufio.NewWriter(w)
 	defer enc.Flush()
 
-	for _, term := range terms {
+	for term := range terms {
 		lx := l[term]
 		buf := make([]byte, 4)
 		for _, p := range lx.Frequencies {

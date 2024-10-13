@@ -18,12 +18,12 @@ func TestTokenize(t *testing.T) {
 	}{
 		{
 			"Basic",
-			"Hello, world!",
+			"hello, world!",
 			[]string{"hello", "world"},
 		},
 		{
 			"Punctuation",
-			"It's a test.",
+			"it's a test.",
 			[]string{"it", "s", "a", "test"},
 		},
 
@@ -39,7 +39,7 @@ func TestTokenize(t *testing.T) {
 		},
 		{
 			"First ms-marco line",
-			"The presence of communication amid scientific minds was equally important to the success of the Manhattan Project as scientific intellect was. The only cloud hanging over the impressive achievement of the atomic researchers and engineers is what their success truly meant; hundreds of thousands of innocent lives obliterated.",
+			"the presence of communication amid scientific minds was equally important to the success of the manhattan project as scientific intellect was. the only cloud hanging over the impressive achievement of the atomic researchers and engineers is what their success truly meant; hundreds of thousands of innocent lives obliterated.",
 			[]string{
 				"the", "presence", "of", "communication", "amid", "scientific", "minds",
 				"was", "equally", "important", "to", "the", "success", "of", "the", "manhattan",

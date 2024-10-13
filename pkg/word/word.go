@@ -16,7 +16,6 @@ var punctuationRemover = strings.NewReplacer(
 )
 
 func Tokenize(s string) []string {
-	s = strings.ToLower(s)
 	s = punctuationRemover.Replace(s)
 	return strings.Fields(s)
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 	"sync"
 
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
@@ -50,24 +50,25 @@ func (b *builder) Add(freqs map[string]uint32, doc inverseindex.Document) {
 	}
 }
 
-func (b *builder) Encode(folderPath string) error {
+func (b *builder) Encode(path string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	defer func() { b.dumpCounter++ }()
 
 	log.Println("dumping...")
+	defer log.Println("..end")
 
 	var wg errgroup.Group
 
-	folderPath = path.Join(folderPath, fmt.Sprint(b.dumpCounter))
-	err := os.MkdirAll(folderPath, 0o755)
+	partitionPath := filepath.Join(path, fmt.Sprint(b.dumpCounter))
+	err := os.MkdirAll(partitionPath, 0o755)
 	if err != nil {
 		return err
 	}
 
 	wg.Go(func() error {
 		// encode the doc
-		docFile, err := os.Create(path.Join(folderPath, "doc.bin"))
+		docFile, err := os.Create(filepath.Join(partitionPath, "doc.bin"))
 		if err != nil {
 			return err
 		}
@@ -79,7 +80,7 @@ func (b *builder) Encode(folderPath string) error {
 	terms := b.Lexicon.Terms()
 
 	wg.Go(func() error {
-		termFile, err := os.Create(path.Join(folderPath, "terms.bin"))
+		termFile, err := os.Create(filepath.Join(partitionPath, "terms.bin"))
 		if err != nil {
 			return err
 		}
@@ -88,7 +89,7 @@ func (b *builder) Encode(folderPath string) error {
 	})
 
 	wg.Go(func() error {
-		postingFile, err := os.Create(path.Join(folderPath, "posting.bin"))
+		postingFile, err := os.Create(filepath.Join(partitionPath, "posting.bin"))
 		if err != nil {
 			return err
 		}
@@ -97,7 +98,7 @@ func (b *builder) Encode(folderPath string) error {
 	})
 
 	wg.Go(func() error {
-		freqFile, err := os.Create(path.Join(folderPath, "freqs.bin"))
+		freqFile, err := os.Create(filepath.Join(partitionPath, "freqs.bin"))
 		if err != nil {
 			return err
 		}
@@ -108,8 +109,20 @@ func (b *builder) Encode(folderPath string) error {
 	if err := wg.Wait(); err != nil {
 		return err
 	}
+
+	statsFile, err := os.OpenFile(filepath.Join(path, "stats.bin"), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return err
+	}
+
+	_, err = statsFile.WriteString(fmt.Sprintf("%d\n", b.docCounter))
+	if err != nil {
+		return err
+	}
+
+	defer statsFile.Close()
+
 	// make this better
-	log.Println("..end")
 	b.Lexicon.Clear()
 	b.Collection.Clear()
 	return nil

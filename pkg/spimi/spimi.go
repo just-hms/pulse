@@ -162,8 +162,6 @@ func Merge(path string) error {
 	}
 	encoder := gob.NewEncoder(f)
 
-	// TODO: refactor inverseindex.GlobalTermWithKey
-
 	for key, t, ok := it.Next(); ok; key, _, ok = it.Next() {
 		err := encoder.Encode(withkey.WithKey[*inverseindex.GlobalTerm]{
 			Key:   string(key),

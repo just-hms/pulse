@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
+	"github.com/just-hms/pulse/pkg/engine/config"
 	"github.com/just-hms/pulse/pkg/engine/seeker"
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
@@ -87,6 +88,13 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 		}
 	}
 
+	stats, err := config.Load(path)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(stats)
+
 	results := make([][]docInfo, len(partitions))
 
 	// 	launch the query for each partition
@@ -100,7 +108,7 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 
 			folder := filepath.Join(path, partition.Name())
 
-			termsFile, err := os.Open(filepath.Join(path, "terms.bin"))
+			termsFile, err := os.Open(filepath.Join(folder, "terms.bin"))
 			if err != nil {
 				return err
 			}
@@ -119,7 +127,6 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 					})
 				}
 			}
-
 			postingsFile, err := os.Open(filepath.Join(folder, "posting.bin"))
 			if err != nil {
 				return err
@@ -146,8 +153,8 @@ func Search(q string, path string, k int) (inverseindex.Collection, error) {
 					return int(a.ID) - int(b.ID)
 				})
 
-				docScore := getDocScore(curSeeks)
-				scores.Add(docScore)
+				score := getDocScore(curSeeks)
+				scores.Add(score)
 
 				// seek to the next
 				for _, s := range curSeeks {

@@ -19,6 +19,7 @@ func (c *Collection) Clear() {
 }
 
 func (c *Collection) Encode(w io.Writer) {
+	// TODO: write down everything with a fixed size DOCNO, don't write the ID is redundant
 	enc := gob.NewEncoder(w)
 	for _, doc := range *c {
 		enc.Encode(doc)
