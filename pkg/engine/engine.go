@@ -21,14 +21,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type DocInfo struct {
-	Document inverseindex.Document
-	Score    float64
-	ID       uint32
-}
-
-func MinDoc(a, b *DocInfo) int { return int(a.Score) - int(b.Score) }
-
 func getDocScore(seekers []*seeker.Seeker) *DocInfo {
 	res := 0.0
 	docID := seekers[0].ID
@@ -138,7 +130,7 @@ func Search(query string, path string, k int) ([]*DocInfo, error) {
 				seekers = append(seekers, s)
 			}
 
-			scores := box.NewBox(MinDoc, k)
+			scores := box.NewBox(k, func(a, b *DocInfo) int { return a.Less(b) })
 
 			for {
 				if len(seekers) == 0 {
@@ -167,7 +159,7 @@ func Search(query string, path string, k int) ([]*DocInfo, error) {
 		return nil, err
 	}
 
-	scores := box.NewBox(MinDoc, k)
+	scores := box.NewBox(k, func(a, b *DocInfo) int { return a.Less(b) })
 	for _, res := range results {
 		scores.Add(res...)
 	}

@@ -16,7 +16,7 @@ func TestBoxAdd(t *testing.T) {
 	cmp := func(a, b int) int { return a - b }
 
 	// Create a new Box with integer type and maxSize set to 3
-	b := box.NewBox(cmp, 3)
+	b := box.NewBox(3, cmp)
 
 	// Add elements
 	b.Add(1)

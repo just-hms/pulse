@@ -39,6 +39,6 @@ func main() {
 	}
 
 	for _, doc := range res {
-		fmt.Println(string(doc.Document.No[:]))
+		fmt.Println(doc)
 	}
 }

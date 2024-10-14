@@ -2,8 +2,6 @@ package box
 
 import "slices"
 
-type CmpFunc[T any] func(a, b T) int
-
 type Box[T any] interface {
 	Add(el ...T)
 	Size() int
@@ -12,7 +10,7 @@ type Box[T any] interface {
 
 var _ Box[int] = &box[int]{}
 
-func NewBox[T any](cmp CmpFunc[T], maxSize int) Box[T] {
+func NewBox[T any](maxSize int, cmp func(a, b T) int) Box[T] {
 	return &box[T]{
 		cmp:     cmp,
 		maxSize: maxSize,

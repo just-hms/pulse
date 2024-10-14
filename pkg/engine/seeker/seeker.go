@@ -42,7 +42,7 @@ func (s *Seeker) Next() {
 		panic(fmt.Sprintf("seeker: %v, while reading freqs, with error: %v", s, err))
 	}
 
-	// : specify bit position in future
+	// todo: specify bit position in future
 	s.pos += 4
 }
 
