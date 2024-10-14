@@ -1,21 +1,18 @@
 package engine
 
 import (
-	"encoding/gob"
-	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 
-	iradix "github.com/hashicorp/go-immutable-radix/v2"
 	"github.com/just-hms/pulse/pkg/engine/config"
 	"github.com/just-hms/pulse/pkg/engine/seeker"
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
 	"github.com/just-hms/pulse/pkg/structures/box"
+	"github.com/just-hms/pulse/pkg/structures/radix"
 	"github.com/just-hms/pulse/pkg/structures/slicex"
 	"github.com/just-hms/pulse/pkg/structures/withkey"
 	"golang.org/x/sync/errgroup"
@@ -26,47 +23,21 @@ func getDocScore(seekers []*seeker.Seeker) *DocInfo {
 	docID := seekers[0].ID
 	// todo: start with tfidf
 	for _, s := range seekers {
-		res += float64(s.Freq)
+		res += float64(s.Frequence)
 	}
 	return &DocInfo{Score: res, ID: docID}
-}
-
-func getLexicon[T any](reader io.Reader) (*iradix.Tree[T], error) {
-
-	lexicon := iradix.New[T]().Txn()
-
-	termDecoder := gob.NewDecoder(reader)
-	// read the terms start and shit
-	for {
-		t := withkey.WithKey[T]{}
-		err := termDecoder.Decode(&t)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		lexicon.Insert([]byte(t.Key), t.Value)
-	}
-
-	return lexicon.Commit(), nil
 }
 
 func Search(query string, path string, k int) ([]*DocInfo, error) {
 	qTokens := preprocess.GetTokens(query)
 
-	partitions, err := os.ReadDir(path)
+	globalTermsFile, err := os.Open(filepath.Join(path, "terms.bin"))
 	if err != nil {
 		return nil, err
 	}
 
-	termsFile, err := os.Open(filepath.Join(path, "terms.bin"))
-	if err != nil {
-		return nil, err
-	}
-
-	globalLexicon, err := getLexicon[inverseindex.GlobalTerm](termsFile)
+	globalLexicon := radix.New[inverseindex.GlobalTerm]()
+	err = globalLexicon.Decode(globalTermsFile)
 	if err != nil {
 		return nil, err
 	}
@@ -76,12 +47,20 @@ func Search(query string, path string, k int) ([]*DocInfo, error) {
 		if t, ok := globalLexicon.Get([]byte(qToken)); ok {
 			qGlobalTerms = append(qGlobalTerms, withkey.WithKey[inverseindex.GlobalTerm]{
 				Key:   qToken,
-				Value: t,
+				Value: *t,
 			})
 		}
 	}
 
 	var wg errgroup.Group
+
+	wg.SetLimit(1)
+
+	partitions, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
 	results := make([][]*DocInfo, len(partitions))
 
 	// 	launch the query for each partition
@@ -95,12 +74,14 @@ func Search(query string, path string, k int) ([]*DocInfo, error) {
 
 			folder := filepath.Join(path, partition.Name())
 
-			termsFile, err := os.Open(filepath.Join(folder, "terms.bin"))
+			f, err := inverseindex.OpenLexiconFiles(folder)
 			if err != nil {
 				return err
 			}
+			defer f.Close()
 
-			localLexicon, err := getLexicon[inverseindex.LocalTerm](termsFile)
+			localLexicon := radix.New[inverseindex.LocalTerm]()
+			err = localLexicon.Decode(f.TermsFile)
 			if err != nil {
 				return err
 			}
@@ -110,22 +91,14 @@ func Search(query string, path string, k int) ([]*DocInfo, error) {
 				if t, ok := localLexicon.Get([]byte(qTerm.Key)); ok {
 					qLocalTerms = append(qLocalTerms, withkey.WithKey[inverseindex.LocalTerm]{
 						Key:   qTerm.Key,
-						Value: t,
+						Value: *t,
 					})
 				}
 			}
-			postingsFile, err := os.Open(filepath.Join(folder, "posting.bin"))
-			if err != nil {
-				return err
-			}
 
-			freqFile, err := os.Open(filepath.Join(folder, "freqs.bin"))
-			if err != nil {
-				return err
-			}
 			seekers := make([]*seeker.Seeker, 0, len(qLocalTerms))
 			for _, t := range qLocalTerms {
-				s := seeker.NewSeeker(postingsFile, freqFile, t)
+				s := seeker.NewSeeker(f.PostingFile, f.FreqsFile, t)
 				s.Next()
 				seekers = append(seekers, s)
 			}
@@ -210,7 +183,7 @@ func filldocs(partitions []fs.DirEntry, path string, toClone []*DocInfo) error {
 			return err
 		}
 		for _, doc := range partitionDocs {
-			if err := doc.Document.Decode(doc.ID, docsFile); err != nil {
+			if err := doc.Decode(doc.ID, docsFile); err != nil {
 				return err
 			}
 		}

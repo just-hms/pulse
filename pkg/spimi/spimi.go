@@ -1,19 +1,15 @@
 package spimi
 
 import (
-	"encoding/gob"
-	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
 	"time"
 
-	iradix "github.com/hashicorp/go-immutable-radix/v2"
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
-	"github.com/just-hms/pulse/pkg/structures/withkey"
+	"github.com/just-hms/pulse/pkg/structures/radix"
 )
 
 func Parse(r ChunkReader, numWorkers int, path string) error {
@@ -115,7 +111,8 @@ func Merge(path string) error {
 		return err
 	}
 
-	lexicon := iradix.New[*inverseindex.GlobalTerm]().Txn()
+	gLexicon := radix.New[inverseindex.GlobalTerm]()
+
 	for _, partition := range partitions {
 		if !partition.IsDir() {
 			continue
@@ -126,47 +123,23 @@ func Merge(path string) error {
 			return err
 		}
 
-		reader := gob.NewDecoder(f)
-
-		for {
-			t := withkey.WithKey[inverseindex.LocalTerm]{}
-			err = reader.Decode(&t)
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			if err != nil {
-				return err
-			}
-
-			key := []byte(t.Key)
-
-			if v, ok := lexicon.Get(key); ok {
-				v.DocFreq += t.Value.DocFreq
-			} else {
-				lexicon.Insert(key, &inverseindex.GlobalTerm{
-					DocFreq: t.Value.DocFreq,
-				})
-			}
+		lLexicon := radix.New[inverseindex.GlobalTerm]()
+		err = lLexicon.Decode(f)
+		if err != nil {
+			return err
 		}
+
+		gLexicon.Append(lLexicon, func(a, b inverseindex.GlobalTerm) inverseindex.GlobalTerm {
+			return inverseindex.GlobalTerm{DocFreq: a.DocFreq + b.DocFreq}
+		})
+
 	}
 
 	f, err := os.Create(filepath.Join(path, "terms.bin"))
 	if err != nil {
 		return err
 	}
-	encoder := gob.NewEncoder(f)
+	defer f.Close()
 
-	it := lexicon.Commit().Root().Iterator()
-
-	for key, t, ok := it.Next(); ok; key, _, ok = it.Next() {
-		err := encoder.Encode(withkey.WithKey[*inverseindex.GlobalTerm]{
-			Key:   string(key),
-			Value: t,
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return gLexicon.Encode(f)
 }

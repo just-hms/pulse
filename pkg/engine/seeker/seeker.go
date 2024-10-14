@@ -10,35 +10,36 @@ import (
 )
 
 type Seeker struct {
-	docFile, freqFile *os.File
+	postingFile, freqFile *os.File
 
 	ID              uint32
-	Freq            uint32
+	Frequence       uint32
 	start, pos, end uint32
 
 	// debugging purpose, will probably be removed
 	term string
 }
 
-func NewSeeker(docFile, freqFile *os.File, t withkey.WithKey[inverseindex.LocalTerm]) *Seeker {
+func NewSeeker(postingFile, freqFile *os.File, t withkey.WithKey[inverseindex.LocalTerm]) *Seeker {
 	return &Seeker{
-		term:     t.Key,
-		start:    t.Value.StartOffset,
-		pos:      t.Value.StartOffset,
-		end:      t.Value.EndOffset,
-		docFile:  docFile,
-		freqFile: freqFile,
+		term:  t.Key,
+		start: t.Value.StartOffset,
+		pos:   t.Value.StartOffset,
+		end:   t.Value.EndOffset,
+
+		postingFile: postingFile,
+		freqFile:    freqFile,
 	}
 }
 
 func (s *Seeker) Next() {
-	s.docFile.Seek(int64(s.pos), 0)
-	if err := binary.Read(s.docFile, binary.LittleEndian, &s.ID); err != nil {
+	s.postingFile.Seek(int64(s.pos), 0)
+	if err := binary.Read(s.postingFile, binary.LittleEndian, &s.ID); err != nil {
 		panic(fmt.Sprintf("seeker: %v, while reading docs, with error: %v", s, err))
 	}
 
 	s.freqFile.Seek(int64(s.pos), 0)
-	if err := binary.Read(s.freqFile, binary.LittleEndian, &s.Freq); err != nil {
+	if err := binary.Read(s.freqFile, binary.LittleEndian, &s.Frequence); err != nil {
 		panic(fmt.Sprintf("seeker: %v, while reading freqs, with error: %v", s, err))
 	}
 

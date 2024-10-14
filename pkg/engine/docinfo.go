@@ -7,9 +7,9 @@ import (
 )
 
 type DocInfo struct {
-	Document inverseindex.Document
-	Score    float64
-	ID       uint32
+	inverseindex.Document
+	Score float64
+	ID    uint32
 }
 
 func (doc *DocInfo) Less(other *DocInfo) int {

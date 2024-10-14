@@ -17,7 +17,6 @@ type builder struct {
 	Collection inverseindex.Collection
 	mu         sync.Mutex
 
-	nextDocID   uint32
 	dumpCounter uint32
 }
 
@@ -26,7 +25,6 @@ func newBuilder() *builder {
 		Lexicon:     make(inverseindex.Lexicon),
 		Collection:  []inverseindex.Document{},
 		mu:          sync.Mutex{},
-		nextDocID:   0,
 		dumpCounter: 0,
 	}
 }
@@ -36,22 +34,7 @@ func (b *builder) Add(freqs map[string]uint32, doc inverseindex.Document) {
 	defer b.mu.Unlock()
 
 	b.Collection = append(b.Collection, doc)
-
-	for term, freq := range freqs {
-		if _, ok := b.Lexicon[term]; !ok {
-			b.Lexicon[term] = &inverseindex.LexVal{
-				Posting:     make([]uint32, 0, 100),
-				Frequencies: make([]uint32, 0, 100),
-			}
-		}
-
-		lx := b.Lexicon[term]
-		lx.DocFreq += freq
-		lx.Posting = append(lx.Posting, b.nextDocID)
-		lx.Frequencies = append(lx.Frequencies, freq)
-	}
-	b.nextDocID++
-
+	b.Lexicon.Add(freqs, uint32(len(b.Collection)-1))
 }
 
 func (b *builder) Encode(path string) error {
@@ -71,43 +54,22 @@ func (b *builder) Encode(path string) error {
 	}
 
 	wg.Go(func() error {
-		// encode the doc
-		docFile, err := os.Create(filepath.Join(partitionPath, "doc.bin"))
+		f, err := os.Create(filepath.Join(partitionPath, "doc.bin"))
 		if err != nil {
 			return err
 		}
-		b.Collection.Encode(docFile)
-		return docFile.Close()
-	})
+		defer f.Close()
+		return b.Collection.Encode(f)
 
-	// todo: in future the encode should be done in a single function (the freqs and posting info must be compressed)
-	terms := b.Lexicon.Terms()
-
-	wg.Go(func() error {
-		termFile, err := os.Create(filepath.Join(partitionPath, "terms.bin"))
-		if err != nil {
-			return err
-		}
-		b.Lexicon.EncodeTerms(termFile, terms)
-		return termFile.Close()
 	})
 
 	wg.Go(func() error {
-		postingFile, err := os.Create(filepath.Join(partitionPath, "posting.bin"))
+		f, err := inverseindex.CreateLexiconFiles(partitionPath)
 		if err != nil {
 			return err
 		}
-		b.Lexicon.EncodePostings(postingFile, terms)
-		return postingFile.Close()
-	})
-
-	wg.Go(func() error {
-		freqFile, err := os.Create(filepath.Join(partitionPath, "freqs.bin"))
-		if err != nil {
-			return err
-		}
-		b.Lexicon.EncodeFreqs(freqFile, terms)
-		return freqFile.Close()
+		defer f.Close()
+		return b.Lexicon.Encode(f)
 	})
 
 	if err := wg.Wait(); err != nil {
@@ -116,20 +78,20 @@ func (b *builder) Encode(path string) error {
 
 	// write down at which document we arrived
 	{
-		statsFile, err := os.OpenFile(filepath.Join(path, "stats.bin"), os.O_RDWR|os.O_CREATE, 0600)
+		f, err := os.OpenFile(filepath.Join(path, "stats.bin"), os.O_RDWR|os.O_CREATE, 0600)
 		if err != nil {
 			return err
 		}
 
-		c, _ := config.Load(statsFile)
-		c.Partitions = append(c.Partitions, b.nextDocID-1)
+		c, _ := config.Load(f)
+		c.Partitions = append(c.Partitions, uint32(len(b.Collection)-1))
 
-		err = c.Dump(statsFile)
+		err = c.Dump(f)
 		if err != nil {
 			return err
 		}
 
-		defer statsFile.Close()
+		defer f.Close()
 	}
 
 	// make this better, maybe use a double buffer

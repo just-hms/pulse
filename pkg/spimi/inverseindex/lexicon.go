@@ -10,14 +10,32 @@ import (
 	"maps"
 
 	"github.com/just-hms/pulse/pkg/structures/withkey"
+	"golang.org/x/sync/errgroup"
 )
 
+// todo: maybe use radix ??
 type Lexicon map[string]*LexVal
 
 type LexVal struct {
-	DocFreq     uint32
+	Frequence   uint32
 	Posting     []uint32
 	Frequencies []uint32
+}
+
+func (l Lexicon) Add(freqs map[string]uint32, docID uint32) {
+	for term, frequence := range freqs {
+		if _, ok := l[term]; !ok {
+			l[term] = &LexVal{
+				Posting:     make([]uint32, 0, 100),
+				Frequencies: make([]uint32, 0, 100),
+			}
+		}
+
+		lx := l[term]
+		lx.Frequence += frequence
+		lx.Posting = append(lx.Posting, docID)
+		lx.Frequencies = append(lx.Frequencies, frequence)
+	}
 }
 
 func (l Lexicon) Clear() {
@@ -26,6 +44,25 @@ func (l Lexicon) Clear() {
 
 func (l Lexicon) Terms() iter.Seq[string] {
 	return maps.Keys(l)
+}
+
+func (l Lexicon) Encode(loc LexiconFiles) error {
+	var wg errgroup.Group
+	terms := l.Terms()
+
+	wg.Go(func() error {
+		return l.EncodeTerms(loc.TermsFile, terms)
+	})
+
+	wg.Go(func() error {
+		return l.EncodePostings(loc.PostingFile, terms)
+	})
+
+	wg.Go(func() error {
+		return l.EncodeFreqs(loc.FreqsFile, terms)
+	})
+
+	return wg.Wait()
 }
 
 func (l Lexicon) EncodeTerms(w io.Writer, terms iter.Seq[string]) error {
@@ -41,7 +78,7 @@ func (l Lexicon) EncodeTerms(w io.Writer, terms iter.Seq[string]) error {
 			Key: term,
 			Value: LocalTerm{
 				GlobalTerm: GlobalTerm{
-					DocFreq: lx.DocFreq,
+					DocFreq: lx.Frequence,
 				},
 				StartOffset: cur,
 				EndOffset:   cur + span,
