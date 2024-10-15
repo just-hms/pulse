@@ -37,7 +37,6 @@ func (b *box[T]) Add(els ...T) {
 				maxIdx = i
 			}
 		}
-		// if the new element is less then the max
 		if b.cmp(el, b.content[maxIdx]) < 0 {
 			b.content[maxIdx] = el
 		}

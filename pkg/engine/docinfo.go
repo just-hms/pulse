@@ -16,6 +16,10 @@ func (doc *DocInfo) Less(other *DocInfo) int {
 	return int(doc.Score) - int(other.Score)
 }
 
+func (doc *DocInfo) More(other *DocInfo) int {
+	return int(other.Score) - int(doc.Score)
+}
+
 func (doc *DocInfo) String() string {
 	return fmt.Sprintf("{%f %s}", doc.Score, string(doc.Document.No[:]))
 }

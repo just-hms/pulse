@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	iradix "github.com/hashicorp/go-immutable-radix/v2"
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
 	"github.com/just-hms/pulse/pkg/structures/radix"
@@ -111,7 +112,7 @@ func Merge(path string) error {
 		return err
 	}
 
-	gLexicon := radix.New[inverseindex.GlobalTerm]()
+	gLexicon := iradix.New[*inverseindex.GlobalTerm]().Txn()
 
 	for _, partition := range partitions {
 		if !partition.IsDir() {
@@ -123,15 +124,20 @@ func Merge(path string) error {
 			return err
 		}
 
-		lLexicon := radix.New[inverseindex.GlobalTerm]()
-		err = lLexicon.Decode(f)
+		lLexicon := iradix.New[*inverseindex.GlobalTerm]()
+		err = radix.Decode(f, &lLexicon)
 		if err != nil {
 			return err
 		}
 
-		gLexicon.Append(lLexicon, func(a, b inverseindex.GlobalTerm) inverseindex.GlobalTerm {
-			return inverseindex.GlobalTerm{DocFreq: a.DocFreq + b.DocFreq}
-		})
+		// append values to gLexicon
+		for lk, lv := range radix.Values(lLexicon) {
+			if gv, ok := gLexicon.Get(lk); ok {
+				gv.DocFreq += lv.DocFreq
+			} else {
+				gLexicon.Insert(lk, lv)
+			}
+		}
 
 	}
 
@@ -141,5 +147,5 @@ func Merge(path string) error {
 	}
 	defer f.Close()
 
-	return gLexicon.Encode(f)
+	return radix.Encode(f, gLexicon.Commit())
 }

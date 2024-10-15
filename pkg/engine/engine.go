@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	iradix "github.com/hashicorp/go-immutable-radix/v2"
 	"github.com/just-hms/pulse/pkg/engine/config"
 	"github.com/just-hms/pulse/pkg/engine/seeker"
 	"github.com/just-hms/pulse/pkg/preprocess"
@@ -18,9 +19,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func getDocScore(seekers []*seeker.Seeker) *DocInfo {
+func getDocInfo(seekers []*seeker.Seeker) *DocInfo {
 	res := 0.0
-	docID := seekers[0].ID
+	docID := seekers[0].DocumentID
 	// todo: start with tfidf
 	for _, s := range seekers {
 		res += float64(s.Frequence)
@@ -36,8 +37,8 @@ func Search(query string, path string, k int) ([]*DocInfo, error) {
 		return nil, err
 	}
 
-	globalLexicon := radix.New[inverseindex.GlobalTerm]()
-	err = globalLexicon.Decode(globalTermsFile)
+	globalLexicon := iradix.New[*inverseindex.GlobalTerm]()
+	err = radix.Decode(globalTermsFile, &globalLexicon)
 	if err != nil {
 		return nil, err
 	}
@@ -53,8 +54,6 @@ func Search(query string, path string, k int) ([]*DocInfo, error) {
 	}
 
 	var wg errgroup.Group
-
-	wg.SetLimit(1)
 
 	partitions, err := os.ReadDir(path)
 	if err != nil {
@@ -80,8 +79,8 @@ func Search(query string, path string, k int) ([]*DocInfo, error) {
 			}
 			defer f.Close()
 
-			localLexicon := radix.New[inverseindex.LocalTerm]()
-			err = localLexicon.Decode(f.TermsFile)
+			localLexicon := iradix.New[*inverseindex.LocalTerm]()
+			err = radix.Decode(f.TermsFile, &localLexicon)
 			if err != nil {
 				return err
 			}
@@ -103,18 +102,18 @@ func Search(query string, path string, k int) ([]*DocInfo, error) {
 				seekers = append(seekers, s)
 			}
 
-			scores := box.NewBox(k, func(a, b *DocInfo) int { return a.Less(b) })
+			scores := box.NewBox(k, func(a, b *DocInfo) int { return a.More(b) })
 
 			for {
 				if len(seekers) == 0 {
 					break
 				}
 				curSeeks := slicex.MinsFunc(seekers, func(a, b *seeker.Seeker) int {
-					return int(a.ID) - int(b.ID)
+					return int(a.DocumentID) - int(b.DocumentID)
 				})
 
-				score := getDocScore(curSeeks)
-				scores.Add(score)
+				docInfo := getDocInfo(curSeeks)
+				scores.Add(docInfo)
 
 				// seek to the next
 				for _, s := range curSeeks {
@@ -132,7 +131,7 @@ func Search(query string, path string, k int) ([]*DocInfo, error) {
 		return nil, err
 	}
 
-	scores := box.NewBox(k, func(a, b *DocInfo) int { return a.Less(b) })
+	scores := box.NewBox(k, func(a, b *DocInfo) int { return a.More(b) })
 	for _, res := range results {
 		scores.Add(res...)
 	}
@@ -173,11 +172,9 @@ func filldocs(partitions []fs.DirEntry, path string, toClone []*DocInfo) error {
 	}
 
 	for i, partitionDocs := range docsByPartition {
-
 		if !partitions[i].IsDir() {
 			continue
 		}
-
 		docsFile, err := os.Open(fmt.Sprintf("%s/doc.bin", filepath.Join(path, partitions[i].Name())))
 		if err != nil {
 			return err

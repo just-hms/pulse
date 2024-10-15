@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"io"
 	"iter"
+	"slices"
 
 	"maps"
 
@@ -17,9 +18,9 @@ import (
 type Lexicon map[string]*LexVal
 
 type LexVal struct {
-	Frequence   uint32
-	Posting     []uint32
-	Frequencies []uint32
+	TermFrequence uint32
+	Posting       []uint32
+	Frequencies   []uint32
 }
 
 func (l Lexicon) Add(freqs map[string]uint32, docID uint32) {
@@ -30,9 +31,8 @@ func (l Lexicon) Add(freqs map[string]uint32, docID uint32) {
 				Frequencies: make([]uint32, 0, 100),
 			}
 		}
-
 		lx := l[term]
-		lx.Frequence += frequence
+		lx.TermFrequence += frequence
 		lx.Posting = append(lx.Posting, docID)
 		lx.Frequencies = append(lx.Frequencies, frequence)
 	}
@@ -48,7 +48,8 @@ func (l Lexicon) Terms() iter.Seq[string] {
 
 func (l Lexicon) Encode(loc LexiconFiles) error {
 	var wg errgroup.Group
-	terms := l.Terms()
+
+	terms := slices.Collect(l.Terms())
 
 	wg.Go(func() error {
 		return l.EncodeTerms(loc.TermsFile, terms)
@@ -65,11 +66,11 @@ func (l Lexicon) Encode(loc LexiconFiles) error {
 	return wg.Wait()
 }
 
-func (l Lexicon) EncodeTerms(w io.Writer, terms iter.Seq[string]) error {
+func (l Lexicon) EncodeTerms(w io.Writer, terms []string) error {
 	enc := gob.NewEncoder(w)
 	var cur uint32 = 0
 
-	for term := range terms {
+	for _, term := range terms {
 		lx := l[term]
 
 		// todo: specify the bit position in future
@@ -78,7 +79,7 @@ func (l Lexicon) EncodeTerms(w io.Writer, terms iter.Seq[string]) error {
 			Key: term,
 			Value: LocalTerm{
 				GlobalTerm: GlobalTerm{
-					DocFreq: lx.Frequence,
+					DocFreq: lx.TermFrequence,
 				},
 				StartOffset: cur,
 				EndOffset:   cur + span,
@@ -93,11 +94,11 @@ func (l Lexicon) EncodeTerms(w io.Writer, terms iter.Seq[string]) error {
 	return nil
 }
 
-func (l Lexicon) EncodePostings(w io.Writer, terms iter.Seq[string]) error {
+func (l Lexicon) EncodePostings(w io.Writer, terms []string) error {
 	enc := bufio.NewWriter(w)
 	defer enc.Flush()
 
-	for term := range terms {
+	for _, term := range terms {
 		lx := l[term]
 		for _, p := range lx.Posting {
 			err := binary.Write(enc, binary.LittleEndian, p)
@@ -109,11 +110,11 @@ func (l Lexicon) EncodePostings(w io.Writer, terms iter.Seq[string]) error {
 	return nil
 }
 
-func (l Lexicon) EncodeFreqs(w io.Writer, terms iter.Seq[string]) error {
+func (l Lexicon) EncodeFreqs(w io.Writer, terms []string) error {
 	enc := bufio.NewWriter(w)
 	defer enc.Flush()
 
-	for term := range terms {
+	for _, term := range terms {
 		lx := l[term]
 		for _, p := range lx.Frequencies {
 			err := binary.Write(enc, binary.LittleEndian, p)
