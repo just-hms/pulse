@@ -9,6 +9,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	workersFlag   uint
+	chunkSizeFlag uint
+)
+
 var spimiCmd = &cobra.Command{
 	Use:     "spimi",
 	Short:   "generate the indexes",
@@ -24,13 +29,13 @@ var spimiCmd = &cobra.Command{
 			}
 		}
 
-		r := readers.NewMsMarco(bufio.NewReader(f), 50_000)
+		r := readers.NewMsMarco(bufio.NewReader(f), int(chunkSizeFlag))
 
 		if err := os.RemoveAll("data/dump"); err != nil {
 			return err
 		}
 
-		if err := spimi.Parse(r, 16, "data/dump"); err != nil {
+		if err := spimi.Parse(r, int(workersFlag), "data/dump"); err != nil {
 			return err
 		}
 
@@ -43,4 +48,7 @@ var spimiCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(spimiCmd)
+
+	spimiCmd.Flags().UintVarP(&workersFlag, "workers", "w", 16, "number of workers indexing the dataset")
+	spimiCmd.Flags().UintVarP(&chunkSizeFlag, "chunk", "c", 50_000, "reader chunk size")
 }
