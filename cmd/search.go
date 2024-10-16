@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/just-hms/pulse/config"
 	"github.com/just-hms/pulse/pkg/engine"
 	"github.com/spf13/cobra"
 )
@@ -16,7 +17,7 @@ var searchCmd = &cobra.Command{
 	Short: "do a query",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		res, err := engine.Search(args[0], "data/dump", int(k))
+		res, err := engine.Search(args[0], config.DATA_FOLDER, int(k))
 		if err != nil {
 			return err
 		}

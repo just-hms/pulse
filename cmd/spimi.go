@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"os"
 
+	"github.com/just-hms/pulse/config"
 	"github.com/just-hms/pulse/pkg/spimi"
 	"github.com/just-hms/pulse/pkg/spimi/readers"
 	"github.com/spf13/cobra"
@@ -29,17 +30,17 @@ var spimiCmd = &cobra.Command{
 			}
 		}
 
+		if err := os.RemoveAll(config.DATA_FOLDER); err != nil {
+			return err
+		}
+
 		r := readers.NewMsMarco(bufio.NewReader(f), int(chunkSizeFlag))
 
-		if err := os.RemoveAll("data/dump"); err != nil {
+		if err := spimi.Parse(r, int(workersFlag), config.DATA_FOLDER); err != nil {
 			return err
 		}
 
-		if err := spimi.Parse(r, int(workersFlag), "data/dump"); err != nil {
-			return err
-		}
-
-		if err := spimi.Merge("data/dump"); err != nil {
+		if err := spimi.Merge(config.DATA_FOLDER); err != nil {
 			return err
 		}
 		return nil
