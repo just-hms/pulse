@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/just-hms/pulse/pkg/engine/config"
+	"github.com/just-hms/pulse/pkg/engine/stats"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
 	"golang.org/x/sync/errgroup"
 )
@@ -83,10 +83,10 @@ func (b *builder) Encode(path string) error {
 			return err
 		}
 
-		c, _ := config.Load(f)
-		c.Partitions = append(c.Partitions, uint32(len(b.Collection)-1))
+		s, _ := stats.Load(f)
+		s.CollectionSize = uint32(len(b.Collection))
 
-		err = c.Dump(f)
+		err = s.Dump(f)
 		if err != nil {
 			return err
 		}

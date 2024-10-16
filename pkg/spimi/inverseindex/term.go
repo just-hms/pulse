@@ -1,7 +1,8 @@
 package inverseindex
 
 type GlobalTerm struct {
-	DocFreq uint32
+	Frequence   uint32
+	Appearences uint32
 }
 
 type LocalTerm struct {

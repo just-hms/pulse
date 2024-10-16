@@ -105,7 +105,6 @@ func Parse(r ChunkReader, numWorkers int, path string) error {
 	return nil
 }
 
-// todo: check merge
 func Merge(path string) error {
 	partitions, err := os.ReadDir(path)
 	if err != nil {
@@ -133,7 +132,8 @@ func Merge(path string) error {
 		// append values to gLexicon
 		for lk, lv := range radix.Values(lLexicon) {
 			if gv, ok := gLexicon.Get(lk); ok {
-				gv.DocFreq += lv.DocFreq
+				gv.Frequence += lv.Frequence
+				gv.Appearences += lv.Appearences
 			} else {
 				gLexicon.Insert(lk, lv)
 			}

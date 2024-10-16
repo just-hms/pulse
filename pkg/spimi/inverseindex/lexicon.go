@@ -18,9 +18,9 @@ import (
 type Lexicon map[string]*LexVal
 
 type LexVal struct {
-	TermFrequence uint32
-	Posting       []uint32
-	Frequencies   []uint32
+	GlobalTerm
+	Posting     []uint32
+	Frequencies []uint32
 }
 
 func (l Lexicon) Add(freqs map[string]uint32, docID uint32) {
@@ -32,7 +32,8 @@ func (l Lexicon) Add(freqs map[string]uint32, docID uint32) {
 			}
 		}
 		lx := l[term]
-		lx.TermFrequence += frequence
+		lx.Frequence += frequence
+		lx.Appearences += 1
 		lx.Posting = append(lx.Posting, docID)
 		lx.Frequencies = append(lx.Frequencies, frequence)
 	}
@@ -78,9 +79,7 @@ func (l Lexicon) EncodeTerms(w io.Writer, terms []string) error {
 		t := withkey.WithKey[LocalTerm]{
 			Key: term,
 			Value: LocalTerm{
-				GlobalTerm: GlobalTerm{
-					DocFreq: lx.TermFrequence,
-				},
+				GlobalTerm:  lx.GlobalTerm,
 				StartOffset: cur,
 				EndOffset:   cur + span,
 			},

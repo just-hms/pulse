@@ -1,22 +1,22 @@
-package config
+package stats
 
 import (
 	"encoding/gob"
 	"io"
 )
 
-type Config struct {
-	Partitions []uint32
+type Stats struct {
+	CollectionSize uint32
 }
 
-func (c *Config) Dump(w io.Writer) error {
+func (c *Stats) Dump(w io.Writer) error {
 	enc := gob.NewEncoder(w)
 	return enc.Encode(c)
 }
 
-func Load(r io.Reader) (*Config, error) {
+func Load(r io.Reader) (*Stats, error) {
 	dec := gob.NewDecoder(r)
-	c := &Config{}
+	c := &Stats{}
 	err := dec.Decode(c)
 	if err != nil {
 		return c, err
