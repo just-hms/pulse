@@ -17,12 +17,13 @@ func TestDocumentIO(t *testing.T) {
 
 	defer f.Close()
 
-	col := inverseindex.Collection{
+	col := inverseindex.Collection{}
+	col.Add(
 		inverseindex.NewDocument("1", 10),
 		inverseindex.NewDocument("2", 2),
 		inverseindex.NewDocument("4", 13),
 		inverseindex.NewDocument("19", 24),
-	}
+	)
 
 	err = col.Encode(f)
 	req.NoError(err)

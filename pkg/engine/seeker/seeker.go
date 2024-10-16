@@ -16,13 +16,12 @@ type Seeker struct {
 	Frequence       uint32
 	start, cur, end uint32
 
-	// debugging purpose, will probably be removed
-	term string
+	Term withkey.WithKey[inverseindex.LocalTerm]
 }
 
 func NewSeeker(postingFile, freqFile *os.File, t withkey.WithKey[inverseindex.LocalTerm]) *Seeker {
 	return &Seeker{
-		term:  t.Key,
+		Term:  t,
 		start: t.Value.StartOffset,
 		cur:   t.Value.StartOffset,
 		end:   t.Value.EndOffset,
@@ -53,7 +52,7 @@ func (s *Seeker) Next() {
 }
 
 func (s *Seeker) String() string {
-	return fmt.Sprintf("{%s %d:%d:%d}", s.term, s.start, s.cur, s.end)
+	return fmt.Sprintf("{%s %d:%d:%d}", s.Term.Key, s.start, s.cur, s.end)
 }
 
 // EOD (end of docs) returns true if the seeker have reached the end of the term's document

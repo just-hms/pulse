@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/just-hms/pulse/pkg/engine/stats"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
+	"github.com/just-hms/pulse/pkg/spimi/stats"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -22,8 +22,8 @@ type builder struct {
 
 func newBuilder() *builder {
 	return &builder{
-		Lexicon:     make(inverseindex.Lexicon),
-		Collection:  []inverseindex.Document{},
+		Lexicon:     inverseindex.Lexicon{},
+		Collection:  inverseindex.Collection{},
 		mu:          sync.Mutex{},
 		dumpCounter: 0,
 	}
@@ -33,8 +33,8 @@ func (b *builder) Add(freqs map[string]uint32, doc inverseindex.Document) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.Collection = append(b.Collection, doc)
-	b.Lexicon.Add(freqs, uint32(len(b.Collection)-1))
+	b.Collection.Add(doc)
+	b.Lexicon.Add(freqs, uint32(b.Collection.Len()-1))
 }
 
 func (b *builder) Encode(path string) error {
@@ -84,7 +84,7 @@ func (b *builder) Encode(path string) error {
 		}
 
 		s, _ := stats.Load(f)
-		s.CollectionSize = uint32(len(b.Collection))
+		s.CollectionSize += uint32(b.Collection.Len())
 
 		err = s.Dump(f)
 		if err != nil {

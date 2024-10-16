@@ -6,7 +6,8 @@ import (
 )
 
 type Stats struct {
-	CollectionSize uint32
+	CollectionSize      uint32
+	AverageDocumentSize float64
 }
 
 func (c *Stats) Dump(w io.Writer) error {

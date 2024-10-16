@@ -14,6 +14,7 @@ type Document struct {
 const DOC_SIZE = unsafe.Sizeof(Document{})
 
 func NewDocument(no string, size int) Document {
+	// todo: check this (strange)
 	if len(no) > 8 {
 		panic("dockNo cannot be bigger then 8")
 	}

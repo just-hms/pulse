@@ -23,8 +23,6 @@ func TestSeeker(t *testing.T) {
 	req := require.New(t)
 
 	dir := t.TempDir()
-	dir = "/tmp/"
-
 	{
 		lex := inverseindex.Lexicon{}
 
