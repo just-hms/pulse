@@ -1,11 +1,5 @@
 # pulse
 
-<!--toc:start-->
-- [pulse](#pulse)
-  - [download MSMARCO](#download-msmarco)
-  - [profiling](#profiling)
-<!--toc:end-->
-
 a blazingly fast search engine written in golang
 
 ## download MSMARCO
@@ -15,13 +9,19 @@ mkdir -p data
 curl -o data/dataset.tar.gz https://msmarco.blob.core.windows.net/msmarcoranking/collection.tar.gz
 ```
 
-## profiling 
+## install TRECEVAL
 
 ```shell
-go install github.com/google/pprof@latest
-
-go build path/to/file.go
-./file --cpuprofile
-pprof -http:localhost:8080 ./index ./profile.out
+git clone https://github.com/usnistgov/trec_eval.git
+cd trec_eval
+make
+sudo mv trec_eval /usr/local/bin/
 ```
+
+## todo
+
+- [] add conjunctive & disjunctive
+- [] add compression
+- [] maybe use some embeddings for scoring function
+- [] implement `nextGEQ`
 

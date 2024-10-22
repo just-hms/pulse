@@ -5,7 +5,6 @@ import (
 	"io"
 )
 
-// todo: add avg document size
 type Collection struct {
 	data      []Document
 	totalSize uint32

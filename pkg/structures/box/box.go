@@ -6,6 +6,8 @@ type Box[T any] interface {
 	Add(el ...T)
 	Size() int
 	Values() []T
+	Max() T
+	Cap() int
 }
 
 var _ Box[int] = &box[int]{}
@@ -49,7 +51,16 @@ func (b *box[T]) Values() []T {
 	return b.content
 }
 
+func (b *box[T]) Max() T {
+	return slices.MaxFunc(b.content, b.cmp)
+}
+
 // Size returns the box's size
 func (b *box[T]) Size() int {
 	return len(b.content)
+}
+
+// Cap returns the box's size
+func (b *box[T]) Cap() int {
+	return b.maxSize
 }

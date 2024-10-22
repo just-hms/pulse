@@ -19,13 +19,18 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// todo: put this as a input of the search
-var metric Metric
+func GetUpperScore(seekers []*seeker.Seeker) float64 {
+	res := 0.0
+	for _, s := range seekers {
+		res += float64(s.Term.Value.MaxDocFrequence)
+	}
+	return res
+}
 
-func CalculateDocInfo(seekers []*seeker.Seeker, doc inverseindex.Document, stats *stats.Stats) *DocInfo {
+func CalculateDocInfo(seekers []*seeker.Seeker, doc inverseindex.Document, stats *stats.Stats, s *Settings) *DocInfo {
 	documentID := seekers[0].DocumentID
 
-	switch metric {
+	switch s.Metric {
 	case TFIDF:
 		score := 0.0
 		for _, s := range seekers {
@@ -95,7 +100,7 @@ func Search(query string, path string, s *Settings) ([]*DocInfo, error) {
 		wg.Go(func() error {
 			results[i] = box.NewBox(s.K, func(a, b *DocInfo) int { return a.More(b) })
 			folder := filepath.Join(path, partition.Name())
-			return searchPartition(folder, qGlobalTerms, stats, results[i])
+			return searchPartition(folder, qGlobalTerms, stats, s, results[i])
 		})
 	}
 
@@ -111,7 +116,7 @@ func Search(query string, path string, s *Settings) ([]*DocInfo, error) {
 	return result.Values(), nil
 }
 
-func searchPartition(path string, qGlobalTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, result box.Box[*DocInfo]) error {
+func searchPartition(path string, qGlobalTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result box.Box[*DocInfo]) error {
 	f, err := inverseindex.OpenLexiconFiles(path)
 	if err != nil {
 		return err
@@ -154,12 +159,22 @@ func searchPartition(path string, qGlobalTerms []withkey.WithKey[inverseindex.Gl
 			return int(a.DocumentID) - int(b.DocumentID)
 		})
 
+		// todo: refactor
+		if result.Size() != 0 && result.Size() == result.Cap() && GetUpperScore(seekers) < result.Max().Score {
+			for _, s := range curSeeks {
+				s.Next()
+			}
+			// remove all finished seekers
+			seekers = slices.DeleteFunc(seekers, seeker.EOD)
+			continue
+		}
+
 		doc := inverseindex.Document{}
 		if err := doc.Decode(curSeeks[0].DocumentID, docsFile); err != nil {
 			return err
 		}
 
-		docInfo := CalculateDocInfo(curSeeks, doc, stats)
+		docInfo := CalculateDocInfo(curSeeks, doc, stats, s)
 		result.Add(docInfo)
 
 		// seek to the next
