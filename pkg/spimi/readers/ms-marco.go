@@ -2,7 +2,9 @@ package readers
 
 import (
 	"bufio"
+	"errors"
 	"io"
+	"iter"
 	"log"
 	"strings"
 
@@ -14,6 +16,7 @@ var _ spimi.ChunkReader = &msMarco{}
 type msMarco struct {
 	chunkSize int
 	reader    *bufio.Reader
+	eof       bool
 }
 
 func NewMsMarco(r *bufio.Reader, chunkSize int) *msMarco {
@@ -23,28 +26,45 @@ func NewMsMarco(r *bufio.Reader, chunkSize int) *msMarco {
 	}
 }
 
+func (r *msMarco) EOF() bool {
+	return r.eof
+}
+
 // Read implements index.ChunkReader.
-func (r *msMarco) Read() ([]spimi.Document, error) {
-	res := make([]spimi.Document, r.chunkSize)
+func (r *msMarco) Read() iter.Seq2[[]spimi.Document, error] {
 
-	for i := 0; i < r.chunkSize; i++ {
-		s, err := r.reader.ReadString('\n')
-		if err == io.EOF {
-			return res[:i], nil
-		}
-		if err != nil {
-			return nil, err
-		}
+	return func(yield func([]spimi.Document, error) bool) {
 
-		sPlitted := strings.Split(s, "\t")
-		if len(sPlitted) != 2 {
-			log.Fatalf("'%s' is malformed\n", strings.TrimSpace(s))
-		}
+		res := make([]spimi.Document, r.chunkSize)
 
-		res[i] = spimi.Document{
-			No:      sPlitted[0],
-			Content: strings.TrimSpace(sPlitted[1]),
+		for {
+			for i := 0; i < r.chunkSize; i++ {
+				s, err := r.reader.ReadString('\n')
+				if errors.Is(err, io.EOF) {
+					r.eof = true
+					yield(res[:i], nil)
+					return
+				}
+				if err != nil {
+					if !yield(nil, err) {
+						return
+					}
+				}
+
+				sPlitted := strings.Split(s, "\t")
+				if len(sPlitted) != 2 {
+					log.Fatalf("'%s' is malformed\n", strings.TrimSpace(s))
+				}
+
+				res[i] = spimi.Document{
+					No:      sPlitted[0],
+					Content: strings.TrimSpace(sPlitted[1]),
+				}
+			}
+
+			if !yield(res, nil) {
+				return
+			}
 		}
 	}
-	return res, nil
 }

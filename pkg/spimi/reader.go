@@ -1,7 +1,10 @@
 package spimi
 
+import "iter"
+
 type ChunkReader interface {
-	Read() ([]Document, error)
+	Read() iter.Seq2[[]Document, error]
+	EOF() bool
 }
 
 type Document struct {
