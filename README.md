@@ -2,6 +2,13 @@
 
 a blazingly fast search engine written in golang
 
+## benchmark
+
+```shell
+pulse search "in the town where a I was born lived a man" -m TFIDF -p
+pprof -http=localhost:8080 pulse.prof
+```
+
 ## download MSMARCO
 
 ```shell
