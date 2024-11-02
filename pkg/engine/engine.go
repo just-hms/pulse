@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"io/fs"
 	"math"
 	"os"
@@ -18,6 +19,14 @@ import (
 	"github.com/just-hms/pulse/pkg/structures/withkey"
 	"golang.org/x/sync/errgroup"
 )
+
+type engine struct {
+	path          string
+	globalLexicon *iradix.Tree[*inverseindex.GlobalTerm]
+	localLexicons []*iradix.Tree[*inverseindex.LocalTerm]
+	partititions  []string
+	stats         *stats.Stats
+}
 
 func GetUpperScore(seekers []*seeker.Seeker) float64 {
 	res := 0.0
@@ -51,11 +60,11 @@ func CalculateDocInfo(seekers []*seeker.Seeker, doc inverseindex.Document, stats
 	}
 }
 
-func Search(query string, path string, s *Settings) ([]*DocInfo, error) {
-	qTokens := preprocess.GetTokens(query)
+func Load(path string) (*engine, error) {
 
 	statsFile, err := os.Open(filepath.Join(path, "stats.bin"))
 	if err != nil {
+		fmt.Println(statsFile)
 		return nil, err
 	}
 
@@ -75,9 +84,56 @@ func Search(query string, path string, s *Settings) ([]*DocInfo, error) {
 		return nil, err
 	}
 
+	partitions, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	partitions = slices.DeleteFunc(partitions, func(p fs.DirEntry) bool { return !p.IsDir() })
+	localLexicons := make([]*iradix.Tree[*inverseindex.LocalTerm], len(partitions))
+	partitionsName := make([]string, len(partitions))
+
+	var wg errgroup.Group
+
+	for i, partition := range partitions {
+		// 	launch the query for each partition
+		wg.Go(func() error {
+			partitionsName[i] = filepath.Join(path, partition.Name())
+			f, err := inverseindex.OpenLexiconFiles(partitionsName[i])
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+
+			localLexicons[i] = iradix.New[*inverseindex.LocalTerm]()
+			err = radix.Decode(f.TermsFile, &localLexicons[i])
+			if err != nil {
+				return err
+			}
+
+			return nil
+		})
+	}
+
+	if err := wg.Wait(); err != nil {
+		return nil, err
+	}
+
+	return &engine{
+		path:          path,
+		globalLexicon: globalLexicon,
+		localLexicons: localLexicons,
+		partititions:  partitionsName,
+		stats:         stats,
+	}, nil
+}
+
+func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
+	qTokens := preprocess.GetTokens(query)
+
 	qGlobalTerms := make([]withkey.WithKey[inverseindex.GlobalTerm], 0)
 	for _, qToken := range qTokens {
-		if t, ok := globalLexicon.Get([]byte(qToken)); ok {
+		if t, ok := e.globalLexicon.Get([]byte(qToken)); ok {
 			qGlobalTerms = append(qGlobalTerms, withkey.WithKey[inverseindex.GlobalTerm]{
 				Key:   qToken,
 				Value: *t,
@@ -85,22 +141,14 @@ func Search(query string, path string, s *Settings) ([]*DocInfo, error) {
 		}
 	}
 
-	partitions, err := os.ReadDir(path)
-	if err != nil {
-		return nil, err
-	}
-
-	partitions = slices.DeleteFunc(partitions, func(p fs.DirEntry) bool { return !p.IsDir() })
-
-	results := make([]box.Box[*DocInfo], len(partitions))
+	results := make([]box.Box[*DocInfo], len(e.partititions))
 	var wg errgroup.Group
 
-	for i, partition := range partitions {
+	for i, partition := range e.partititions {
 		// 	launch the query for each partition
 		wg.Go(func() error {
 			results[i] = box.NewBox(s.K, func(a, b *DocInfo) int { return a.More(b) })
-			folder := filepath.Join(path, partition.Name())
-			return searchPartition(folder, qGlobalTerms, stats, s, results[i])
+			return e.searchPartition(partition, qGlobalTerms, e.stats, s, results[i])
 		})
 	}
 
@@ -116,7 +164,7 @@ func Search(query string, path string, s *Settings) ([]*DocInfo, error) {
 	return result.Values(), nil
 }
 
-func searchPartition(path string, qGlobalTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result box.Box[*DocInfo]) error {
+func (e *engine) searchPartition(path string, qGlobalTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result box.Box[*DocInfo]) error {
 	f, err := inverseindex.OpenLexiconFiles(path)
 	if err != nil {
 		return err

@@ -19,13 +19,17 @@ var searchCmd = &cobra.Command{
 	Short: "do a query",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		m, err := engine.ParseMetric(metricFlag)
+		metric, err := engine.ParseMetric(metricFlag)
 		if err != nil {
 			return err
 		}
-		res, err := engine.Search(args[0], config.DATA_FOLDER, &engine.Settings{
+		e, err := engine.Load(config.DATA_FOLDER)
+		if err != nil {
+			return err
+		}
+		res, err := e.Search(args[0], &engine.Settings{
 			K:      int(kFlag),
-			Metric: m,
+			Metric: metric,
 		})
 		if err != nil {
 			return err
