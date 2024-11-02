@@ -1,8 +1,6 @@
 package seeker_test
 
 import (
-	"os"
-	"os/exec"
 	"testing"
 
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
@@ -12,11 +10,6 @@ import (
 	"github.com/just-hms/pulse/pkg/structures/withkey"
 	"github.com/stretchr/testify/require"
 )
-
-func Code(f *os.File) {
-	c := exec.Command("code", f.Name())
-	c.Run()
-}
 
 func TestSeeker(t *testing.T) {
 	t.Parallel()
@@ -56,13 +49,16 @@ func TestSeeker(t *testing.T) {
 			withkey.WithKey[inverseindex.LocalTerm]{Key: key, Value: aTerm},
 		)
 
-		seeker.Next()
-		req.Equal(uint32(2), seeker.Frequence)
-		req.Equal(uint32(0), seeker.DocumentID)
+		err = seeker.Next()
+		req.NoError(err)
 
-		seeker.Next()
-		req.Equal(uint32(16), seeker.Frequence)
+		req.Equal(uint32(0), seeker.DocumentID)
+		req.Equal(uint32(2), seeker.Frequence)
+
+		err = seeker.Next()
+		req.NoError(err)
 		req.Equal(uint32(2), seeker.DocumentID)
+		req.Equal(uint32(16), seeker.Frequence)
 	}
 
 }

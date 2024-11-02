@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
+	"github.com/just-hms/pulse/pkg/bufseekio"
 	"github.com/just-hms/pulse/pkg/engine/seeker"
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
@@ -193,6 +194,8 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		seekers = append(seekers, s)
 	}
 
+	docReader := bufseekio.NewReader(docsFile)
+
 	for {
 		if len(seekers) == 0 {
 			break
@@ -212,7 +215,7 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		}
 
 		doc := inverseindex.Document{}
-		if err := doc.Decode(curSeeks[0].DocumentID, docsFile); err != nil {
+		if err := doc.Decode(curSeeks[0].DocumentID, docReader); err != nil {
 			return err
 		}
 
