@@ -144,11 +144,11 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 	results := make([]box.Box[*DocInfo], len(e.partititions))
 	var wg errgroup.Group
 
-	for i, partition := range e.partititions {
+	for i := range e.partititions {
 		// 	launch the query for each partition
 		wg.Go(func() error {
 			results[i] = box.NewBox(s.K, func(a, b *DocInfo) int { return a.More(b) })
-			return e.searchPartition(partition, qGlobalTerms, e.stats, s, results[i])
+			return e.searchPartition(i, qGlobalTerms, e.stats, s, results[i])
 		})
 	}
 
@@ -164,27 +164,21 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 	return result.Values(), nil
 }
 
-func (e *engine) searchPartition(path string, qGlobalTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result box.Box[*DocInfo]) error {
-	f, err := inverseindex.OpenLexiconFiles(path)
+func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result box.Box[*DocInfo]) error {
+	f, err := inverseindex.OpenLexiconFiles(e.partititions[i])
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	docsFile, err := os.Open(filepath.Join(path, "doc.bin"))
-	if err != nil {
-		return err
-	}
-
-	localLexicon := iradix.New[*inverseindex.LocalTerm]()
-	err = radix.Decode(f.TermsFile, &localLexicon)
+	docsFile, err := os.Open(filepath.Join(e.partititions[i], "doc.bin"))
 	if err != nil {
 		return err
 	}
 
 	qLocalTerms := make([]withkey.WithKey[inverseindex.LocalTerm], 0)
 	for _, qTerm := range qGlobalTerms {
-		if t, ok := localLexicon.Get([]byte(qTerm.Key)); ok {
+		if t, ok := e.localLexicons[i].Get([]byte(qTerm.Key)); ok {
 			qLocalTerms = append(qLocalTerms, withkey.WithKey[inverseindex.LocalTerm]{
 				Key:   qTerm.Key,
 				Value: *t,

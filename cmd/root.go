@@ -9,6 +9,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	profileFlag bool
+)
 var rootCmd = &cobra.Command{
 	Use:   "pulse",
 	Short: "this is the pulse search engine",
@@ -20,6 +23,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.Root().CompletionOptions.DisableDefaultCmd = true
 }
+
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
