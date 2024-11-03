@@ -220,7 +220,6 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		CalculateDocInfo(doc, curSeeks, stats, s)
 		result.Add(doc)
 
-		// todo: check me ??'
 		if result.Size() >= s.K*2 {
 			result.Resize(s.K)
 		}
