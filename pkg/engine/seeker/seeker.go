@@ -12,11 +12,11 @@ import (
 type Seeker struct {
 	postings, freqs io.ReaderAt
 
-	// todo: test []byte
 	buf [4]byte
 
-	DocumentID      uint32
-	Frequence       uint32
+	DocumentID uint32
+	Frequence  uint32
+
 	start, cur, end uint32
 
 	Term withkey.WithKey[inverseindex.LocalTerm]
@@ -40,11 +40,11 @@ func (s *Seeker) Next() error {
 	}
 	s.DocumentID = binary.LittleEndian.Uint32(s.buf[:])
 
-	if _, err := s.freqs.ReadAt(s.buf[:], int64(s.cur)*4); err != nil {
+	if _, err := s.freqs.ReadAt(s.buf[:], int64(s.cur)*4+4); err != nil {
 		return fmt.Errorf("error reading freqFile: %v", err)
 	}
 	s.Frequence = binary.LittleEndian.Uint32(s.buf[:])
-	s.cur += 4
+	s.cur += 8
 	return nil
 }
 

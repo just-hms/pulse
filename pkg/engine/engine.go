@@ -164,11 +164,11 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 }
 
 func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result box.Box[*DocInfo]) error {
-	f, err := inverseindex.OpenLexicon(e.partititions[i])
+	lexReaders, err := inverseindex.OpenLexicon(e.partititions[i])
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer lexReaders.Close()
 
 	docReader, err := mmap.Open(filepath.Join(e.partititions[i], "doc.bin"))
 	if err != nil {
@@ -187,7 +187,7 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 
 	seekers := make([]*seeker.Seeker, 0, len(qLocalTerms))
 	for _, t := range qLocalTerms {
-		s := seeker.NewSeeker(f.Posting, f.Freqs, t)
+		s := seeker.NewSeeker(lexReaders.Posting, lexReaders.Freqs, t)
 		s.Next()
 		seekers = append(seekers, s)
 	}
@@ -200,8 +200,7 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 			return int(a.DocumentID) - int(b.DocumentID)
 		})
 
-		// todo: refactor
-		if result.Size() != 0 && result.Size() == result.Cap() && GetUpperScore(seekers) < result.Max().Score {
+		if result.Size() == result.Cap() && GetUpperScore(curSeeks) < result.Max().Score {
 			for _, s := range curSeeks {
 				s.Next()
 			}

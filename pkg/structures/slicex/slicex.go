@@ -1,22 +1,20 @@
 package slicex
 
-func MinsFunc[S ~[]E, E any](x S, cmp func(a, b E) int) []E {
-	if len(x) < 1 {
-		return []E{}
-	}
+import "slices"
 
-	// get the minumum value
-	m := x[0]
-	for i := 1; i < len(x); i++ {
-		if cmp(x[i], m) < 0 {
-			m = x[i]
+func MinsFunc[S ~[]E, E any](slice S, cmp func(a, b E) int) []E {
+	min := slices.MinFunc(slice, cmp)
+
+	count := 0
+	for _, val := range slice {
+		if cmp(val, min) == 0 {
+			count++
 		}
 	}
 
-	// get all the values
-	res := make(S, 0)
-	for _, val := range x {
-		if cmp(val, m) == 0 {
+	res := make(S, 0, count)
+	for _, val := range slice {
+		if cmp(val, min) == 0 {
 			res = append(res, val)
 		}
 	}
