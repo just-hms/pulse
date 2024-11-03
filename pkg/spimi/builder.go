@@ -64,7 +64,7 @@ func (b *builder) Encode(path string) error {
 	})
 
 	wg.Go(func() error {
-		f, err := inverseindex.CreateLexiconFiles(partitionPath)
+		f, err := inverseindex.CreateLexicon(partitionPath)
 		if err != nil {
 			return err
 		}

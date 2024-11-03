@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/just-hms/pulse/pkg/bufseekio"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
 	"github.com/just-hms/pulse/pkg/structures/withkey"
 )
 
 type Seeker struct {
-	postingFile, freqFile io.ReadSeeker
+	postings, freqs io.ReaderAt
+
+	// todo: test []byte
+	buf [4]byte
 
 	DocumentID      uint32
 	Frequence       uint32
@@ -20,34 +22,28 @@ type Seeker struct {
 	Term withkey.WithKey[inverseindex.LocalTerm]
 }
 
-func NewSeeker(postingFile, freqFile io.ReadSeeker, t withkey.WithKey[inverseindex.LocalTerm]) *Seeker {
-	bufferSize := int(t.Value.EndOffset) - int(t.Value.StartOffset)
+func NewSeeker(postings, freqs io.ReaderAt, t withkey.WithKey[inverseindex.LocalTerm]) *Seeker {
 	s := &Seeker{
-		Term:        t,
-		start:       t.Value.StartOffset,
-		cur:         0,
-		end:         t.Value.EndOffset,
-		postingFile: bufseekio.NewReaderSize(postingFile, bufferSize),
-		freqFile:    bufseekio.NewReaderSize(freqFile, bufferSize),
+		Term:     t,
+		start:    t.Value.StartOffset,
+		cur:      0,
+		end:      t.Value.EndOffset,
+		postings: postings,
+		freqs:    freqs,
 	}
 	return s
 }
 
 func (s *Seeker) Next() error {
-	var err error
-
-	if _, err = s.postingFile.Seek(int64(s.cur), io.SeekStart); err != nil {
-		return fmt.Errorf("error seeking postingFile: %v", err)
-	}
-	if err = binary.Read(s.postingFile, binary.LittleEndian, &s.DocumentID); err != nil {
+	if _, err := s.postings.ReadAt(s.buf[:], int64(s.cur)*4); err != nil {
 		return fmt.Errorf("error reading postingFile: %v", err)
 	}
-	if _, err = s.freqFile.Seek(int64(s.cur), io.SeekStart); err != nil {
-		return fmt.Errorf("error seeking freqFile: %v", err)
-	}
-	if err = binary.Read(s.freqFile, binary.LittleEndian, &s.Frequence); err != nil {
+	s.DocumentID = binary.LittleEndian.Uint32(s.buf[:])
+
+	if _, err := s.freqs.ReadAt(s.buf[:], int64(s.cur)*4); err != nil {
 		return fmt.Errorf("error reading freqFile: %v", err)
 	}
+	s.Frequence = binary.LittleEndian.Uint32(s.buf[:])
 	s.cur += 4
 	return nil
 }

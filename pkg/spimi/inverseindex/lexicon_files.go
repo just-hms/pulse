@@ -1,43 +1,67 @@
 package inverseindex
 
 import (
-	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+
+	"golang.org/x/exp/mmap"
 )
 
+type LexiconReaders struct {
+	Terms          *os.File
+	Posting, Freqs io.ReaderAt
+}
+
+func OpenLexicon(path string) (LexiconReaders, error) {
+	termsReader, err := os.Open(filepath.Join(path, "terms.bin"))
+	if err != nil {
+		return LexiconReaders{}, err
+	}
+
+	postingReader, err := mmap.Open(filepath.Join(path, "posting.bin"))
+	if err != nil {
+		return LexiconReaders{}, fmt.Errorf("failed to open posting file: %w", err)
+	}
+
+	freqReader, err := mmap.Open(filepath.Join(path, "freqs.bin"))
+	if err != nil {
+		return LexiconReaders{}, fmt.Errorf("failed to open posting file: %w", err)
+	}
+
+	return LexiconReaders{
+		Terms:   termsReader,
+		Posting: postingReader,
+		Freqs:   freqReader,
+	}, nil
+
+}
+
+// Close closes all the open file handles in LexiconFiles.
+func (l *LexiconReaders) Close() error {
+	return l.Terms.Close()
+}
+
 type LexiconFiles struct {
-	TermsFile, PostingFile, FreqsFile *os.File
+	Terms, Posting, Freqs *os.File
 }
 
-func OpenLexiconFiles(path string) (LexiconFiles, error) {
-	return openLexiconFiles(path, os.O_RDWR|os.O_CREATE)
-}
+func CreateLexicon(path string) (LexiconFiles, error) {
+	flag := os.O_RDWR | os.O_CREATE | os.O_TRUNC
 
-func CreateLexiconFiles(path string) (LexiconFiles, error) {
-	return openLexiconFiles(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
-}
-
-// OpenLexiconFiles opens or creates the necessary lexicon files (terms.bin, posting.bin, freqs.bin)
-// at the specified path and returns a LexiconFiles struct with open file handles.
-func openLexiconFiles(path string, flag int) (LexiconFiles, error) {
-	termsPath := filepath.Join(path, "terms.bin")
-	postingPath := filepath.Join(path, "posting.bin")
-	freqsPath := filepath.Join(path, "freqs.bin")
-
-	termsFile, err := os.OpenFile(termsPath, flag, 0644)
+	termsFile, err := os.OpenFile(filepath.Join(path, "terms.bin"), flag, 0644)
 	if err != nil {
 		return LexiconFiles{}, fmt.Errorf("failed to open terms file: %w", err)
 	}
 
-	postingFile, err := os.OpenFile(postingPath, flag, 0644)
+	postingFile, err := os.OpenFile(filepath.Join(path, "posting.bin"), flag, 0644)
 	if err != nil {
 		termsFile.Close()
 		return LexiconFiles{}, fmt.Errorf("failed to open posting file: %w", err)
 	}
 
-	freqsFile, err := os.OpenFile(freqsPath, flag, 0644)
+	freqsFile, err := os.OpenFile(filepath.Join(path, "freqs.bin"), flag, 0644)
 	if err != nil {
 		termsFile.Close()
 		postingFile.Close()
@@ -45,16 +69,13 @@ func openLexiconFiles(path string, flag int) (LexiconFiles, error) {
 	}
 
 	return LexiconFiles{
-		TermsFile:   termsFile,
-		PostingFile: postingFile,
-		FreqsFile:   freqsFile,
+		Terms:   termsFile,
+		Posting: postingFile,
+		Freqs:   freqsFile,
 	}, nil
 }
 
 // Close closes all the open file handles in LexiconFiles.
 func (l *LexiconFiles) Close() error {
-	err := l.TermsFile.Close()
-	err = errors.Join(err, l.PostingFile.Close())
-	err = errors.Join(err, l.FreqsFile.Close())
-	return err
+	return l.Terms.Close()
 }

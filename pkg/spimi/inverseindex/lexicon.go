@@ -54,15 +54,15 @@ func (l Lexicon) Encode(loc LexiconFiles) error {
 	terms := slices.Collect(l.Terms())
 
 	wg.Go(func() error {
-		return l.EncodeTerms(loc.TermsFile, terms)
+		return l.EncodeTerms(loc.Terms, terms)
 	})
 
 	wg.Go(func() error {
-		return l.EncodePostings(loc.PostingFile, terms)
+		return l.EncodePostings(loc.Posting, terms)
 	})
 
 	wg.Go(func() error {
-		return l.EncodeFreqs(loc.FreqsFile, terms)
+		return l.EncodeFreqs(loc.Freqs, terms)
 	})
 
 	return wg.Wait()

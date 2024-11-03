@@ -24,7 +24,7 @@ func TestSeeker(t *testing.T) {
 		lex.Add(map[string]uint32{"a": 16, "e": 3}, 2)
 		lex.Add(map[string]uint32{"d": 2, "b": 3}, 3)
 
-		f, err := inverseindex.CreateLexiconFiles(dir)
+		f, err := inverseindex.CreateLexicon(dir)
 		req.NoError(err)
 		defer f.Close()
 
@@ -32,12 +32,12 @@ func TestSeeker(t *testing.T) {
 		req.NoError(err)
 	}
 	{
-		f, err := inverseindex.OpenLexiconFiles(dir)
+		f, err := inverseindex.OpenLexicon(dir)
 		req.NoError(err)
 		defer f.Close()
 
 		localLexicon := iradix.New[inverseindex.LocalTerm]()
-		err = radix.Decode(f.TermsFile, &localLexicon)
+		err = radix.Decode(f.Terms, &localLexicon)
 		req.NoError(err)
 
 		key := "a"
@@ -45,7 +45,7 @@ func TestSeeker(t *testing.T) {
 		req.True(ok)
 
 		seeker := seeker.NewSeeker(
-			f.PostingFile, f.FreqsFile,
+			f.Posting, f.Freqs,
 			withkey.WithKey[inverseindex.LocalTerm]{Key: key, Value: aTerm},
 		)
 

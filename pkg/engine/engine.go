@@ -9,7 +9,6 @@ import (
 	"slices"
 
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
-	"github.com/just-hms/pulse/pkg/bufseekio"
 	"github.com/just-hms/pulse/pkg/engine/seeker"
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
@@ -18,6 +17,7 @@ import (
 	"github.com/just-hms/pulse/pkg/structures/radix"
 	"github.com/just-hms/pulse/pkg/structures/slicex"
 	"github.com/just-hms/pulse/pkg/structures/withkey"
+	"golang.org/x/exp/mmap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -37,9 +37,7 @@ func GetUpperScore(seekers []*seeker.Seeker) float64 {
 	return res
 }
 
-func CalculateDocInfo(seekers []*seeker.Seeker, doc inverseindex.Document, stats *stats.Stats, s *Settings) *DocInfo {
-	documentID := seekers[0].DocumentID
-
+func CalculateDocInfo(doc *DocInfo, seekers []*seeker.Seeker, stats *stats.Stats, s *Settings) {
 	switch s.Metric {
 	case TFIDF:
 		score := 0.0
@@ -48,14 +46,14 @@ func CalculateDocInfo(seekers []*seeker.Seeker, doc inverseindex.Document, stats
 			IDF := math.Log(float64(stats.CollectionSize) / float64(s.Frequence))
 			score += TF * IDF
 		}
-		return &DocInfo{Score: score, Document: doc, ID: documentID}
+		doc.Score = score
 	case BM25:
 		score := 0.0
 		for _, s := range seekers {
 			IDF := math.Log((float64(stats.CollectionSize)-float64(s.Term.Value.Appearences)+0.5)/(float64(s.Term.Value.Appearences)+0.5) + 1)
 			score += IDF * (float64(s.Frequence)*(BM25_k1+1)/float64(s.Frequence) + BM25_k1*(1-BM25_b+BM25_b*(float64(doc.Size)/stats.AverageDocumentSize)))
 		}
-		return &DocInfo{Score: score, Document: doc, ID: documentID}
+		doc.Score = score
 	default:
 		panic("metric not implemented")
 	}
@@ -100,14 +98,14 @@ func Load(path string) (*engine, error) {
 		// 	launch the query for each partition
 		wg.Go(func() error {
 			partitionsName[i] = filepath.Join(path, partition.Name())
-			f, err := inverseindex.OpenLexiconFiles(partitionsName[i])
+			f, err := inverseindex.OpenLexicon(partitionsName[i])
 			if err != nil {
 				return err
 			}
 			defer f.Close()
 
 			localLexicons[i] = iradix.New[*inverseindex.LocalTerm]()
-			err = radix.Decode(f.TermsFile, &localLexicons[i])
+			err = radix.Decode(f.Terms, &localLexicons[i])
 			if err != nil {
 				return err
 			}
@@ -166,13 +164,13 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 }
 
 func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result box.Box[*DocInfo]) error {
-	f, err := inverseindex.OpenLexiconFiles(e.partititions[i])
+	f, err := inverseindex.OpenLexicon(e.partititions[i])
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	docsFile, err := os.Open(filepath.Join(e.partititions[i], "doc.bin"))
+	docReader, err := mmap.Open(filepath.Join(e.partititions[i], "doc.bin"))
 	if err != nil {
 		return err
 	}
@@ -189,12 +187,10 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 
 	seekers := make([]*seeker.Seeker, 0, len(qLocalTerms))
 	for _, t := range qLocalTerms {
-		s := seeker.NewSeeker(f.PostingFile, f.FreqsFile, t)
+		s := seeker.NewSeeker(f.Posting, f.Freqs, t)
 		s.Next()
 		seekers = append(seekers, s)
 	}
-
-	docReader := bufseekio.NewReader(docsFile)
 
 	for {
 		if len(seekers) == 0 {
@@ -214,13 +210,15 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 			continue
 		}
 
-		doc := inverseindex.Document{}
-		if err := doc.Decode(curSeeks[0].DocumentID, docReader); err != nil {
+		doc := &DocInfo{
+			ID: curSeeks[0].DocumentID,
+		}
+		if err := doc.Decode(doc.ID, docReader); err != nil {
 			return err
 		}
 
-		docInfo := CalculateDocInfo(curSeeks, doc, stats, s)
-		result.Add(docInfo)
+		CalculateDocInfo(doc, curSeeks, stats, s)
+		result.Add(doc)
 
 		// seek to the next
 		for _, s := range curSeeks {

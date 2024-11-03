@@ -36,14 +36,17 @@ func (doc *Document) Encode(w io.Writer) error {
 	return nil
 }
 
-func (doc *Document) Decode(ID uint32, rs io.ReadSeeker) error {
-	if _, err := rs.Seek(int64(DOC_SIZE)*int64(ID), 0); err != nil {
+func (doc *Document) Decode(ID uint32, rs io.ReaderAt) error {
+	offset := int64(DOC_SIZE) * int64(ID)
+
+	var buf [4]byte
+
+	if _, err := rs.ReadAt(buf[:], offset+0); err != nil {
 		return err
 	}
-	if err := binary.Read(rs, binary.LittleEndian, &doc.Size); err != nil {
-		return err
-	}
-	if err := binary.Read(rs, binary.LittleEndian, &doc.No); err != nil {
+	doc.Size = binary.LittleEndian.Uint32(buf[:])
+
+	if _, err := rs.ReadAt(doc.No[:], offset+4); err != nil {
 		return err
 	}
 	return nil
