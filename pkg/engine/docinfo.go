@@ -12,12 +12,9 @@ type DocInfo struct {
 	ID    uint32
 }
 
-func (doc *DocInfo) Less(other *DocInfo) int {
+// Cmp implements heap.Orderable.
+func (doc *DocInfo) Cmp(other *DocInfo) int {
 	return int(doc.Score) - int(other.Score)
-}
-
-func (doc *DocInfo) More(other *DocInfo) int {
-	return int(other.Score) - int(doc.Score)
 }
 
 func (doc *DocInfo) String() string {

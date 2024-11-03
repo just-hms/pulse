@@ -13,7 +13,7 @@ import (
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
 	"github.com/just-hms/pulse/pkg/spimi/stats"
-	"github.com/just-hms/pulse/pkg/structures/box"
+	"github.com/just-hms/pulse/pkg/structures/heap"
 	"github.com/just-hms/pulse/pkg/structures/radix"
 	"github.com/just-hms/pulse/pkg/structures/slicex"
 	"github.com/just-hms/pulse/pkg/structures/withkey"
@@ -140,14 +140,13 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 		}
 	}
 
-	results := make([]box.Box[*DocInfo], len(e.partititions))
+	results := make([]heap.Heap[*DocInfo], len(e.partititions))
 	var wg errgroup.Group
 
 	for i := range e.partititions {
 		// 	launch the query for each partition
 		wg.Go(func() error {
-			results[i] = box.NewBox(s.K, func(a, b *DocInfo) int { return a.More(b) })
-			return e.searchPartition(i, qGlobalTerms, e.stats, s, results[i])
+			return e.searchPartition(i, qGlobalTerms, e.stats, s, &results[i])
 		})
 	}
 
@@ -155,15 +154,16 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 		return nil, err
 	}
 
-	result := box.NewBox(s.K, func(a, b *DocInfo) int { return a.More(b) })
+	result := heap.Heap[*DocInfo]{}
 	for _, res := range results {
 		result.Add(res.Values()...)
 	}
+	result.Resize(s.K)
 
 	return result.Values(), nil
 }
 
-func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result box.Box[*DocInfo]) error {
+func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result *heap.Heap[*DocInfo]) error {
 	lexReaders, err := inverseindex.OpenLexicon(e.partititions[i])
 	if err != nil {
 		return err
@@ -200,7 +200,8 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 			return int(a.DocumentID) - int(b.DocumentID)
 		})
 
-		if result.Size() == result.Cap() && GetUpperScore(curSeeks) < result.Max().Score {
+		peek, err := result.Peek()
+		if err == nil && result.Size() >= s.K && GetUpperScore(curSeeks) < peek.Score {
 			for _, s := range curSeeks {
 				s.Next()
 			}
@@ -219,6 +220,11 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		CalculateDocInfo(doc, curSeeks, stats, s)
 		result.Add(doc)
 
+		// todo: check me ??'
+		if result.Size() >= s.K*2 {
+			result.Resize(s.K)
+		}
+
 		// seek to the next
 		for _, s := range curSeeks {
 			s.Next()
@@ -226,6 +232,6 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		// remove all finished seekers
 		seekers = slices.DeleteFunc(seekers, seeker.EOD)
 	}
-
+	result.Resize(s.K)
 	return nil
 }
