@@ -3,8 +3,6 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"os"
-	"runtime/pprof"
 	"strings"
 	"time"
 
@@ -35,15 +33,6 @@ var searchCmd = &cobra.Command{
 			return err
 		}
 
-		if profileFlag {
-			f, err := os.Create("pulse.prof")
-			if err != nil {
-				return err
-			}
-			pprof.StartCPUProfile(f)
-			defer pprof.StopCPUProfile()
-		}
-
 		// Process each search argument
 		for _, arg := range args {
 
@@ -71,7 +60,6 @@ var searchCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(searchCmd)
 
-	searchCmd.Flags().BoolVarP(&profileFlag, "profile", "p", false, "profile the execution")
 	searchCmd.Flags().UintVarP(&kFlag, "doc2ret", "k", 10, "number of documents to be returned")
 	searchCmd.Flags().BoolVarP(&interactiveFlag, "interactive", "i", false, "interactive search")
 	searchCmd.Flags().StringVarP(&metricFlag, "metric", "m", "BM25",

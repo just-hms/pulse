@@ -2,7 +2,6 @@ package engine
 
 import (
 	"fmt"
-	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
 	"github.com/just-hms/pulse/pkg/engine/seeker"
 	"github.com/just-hms/pulse/pkg/preprocess"
+	"github.com/just-hms/pulse/pkg/spimi"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
 	"github.com/just-hms/pulse/pkg/spimi/stats"
 	"github.com/just-hms/pulse/pkg/structures/heap"
@@ -83,12 +83,11 @@ func Load(path string) (*engine, error) {
 		return nil, err
 	}
 
-	partitions, err := os.ReadDir(path)
+	partitions, err := spimi.ReadPartitions(path)
 	if err != nil {
 		return nil, err
 	}
 
-	partitions = slices.DeleteFunc(partitions, func(p fs.DirEntry) bool { return !p.IsDir() })
 	localLexicons := make([]*iradix.Tree[*inverseindex.LocalTerm], len(partitions))
 	partitionsName := make([]string, len(partitions))
 

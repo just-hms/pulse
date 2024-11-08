@@ -2,9 +2,11 @@ package spimi
 
 import (
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
@@ -98,4 +100,13 @@ func (b *builder) Encode(path string) error {
 	b.Lexicon.Clear()
 	b.Collection.Clear()
 	return nil
+}
+
+func ReadPartitions(path string) ([]fs.DirEntry, error) {
+	partitions, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return slices.DeleteFunc(partitions, func(p fs.DirEntry) bool { return !p.IsDir() }), nil
 }

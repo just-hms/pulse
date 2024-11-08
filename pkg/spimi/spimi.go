@@ -1,6 +1,7 @@
 package spimi
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,8 +15,14 @@ import (
 )
 
 const (
-	sleep                  = 10 * time.Second
-	memoryThreshold uint64 = 4 * 1024 * 1024 * 1024
+	KB = 1024
+	MB = KB * 1024
+	GB = MB * 1024
+)
+
+const (
+	sleep                  = time.Second
+	memoryThreshold uint64 = 1.5 * GB
 )
 
 func Parse(r ChunkReader, numWorkers int, path string) error {
@@ -30,15 +37,24 @@ func Parse(r ChunkReader, numWorkers int, path string) error {
 	workers.SetLimit(numWorkers)
 
 	dumper.Go(func() error {
+		hit := 0
 		for {
 			time.Sleep(sleep)
 
 			runtime.ReadMemStats(&memStats)
 			eof := r.EOF()
 
-			if memStats.Alloc < memoryThreshold && !eof {
+			if memStats.Alloc > memoryThreshold {
+				hit++
+			} else {
+				hit = 0
+			}
+
+			if hit < 3 && !eof {
 				continue
 			}
+
+			hit = 0
 
 			if eof {
 				err := workers.Wait()
@@ -83,7 +99,9 @@ func Parse(r ChunkReader, numWorkers int, path string) error {
 }
 
 func Merge(path string) error {
-	partitions, err := os.ReadDir(path)
+	log.Println("merging...")
+	defer log.Println("...end")
+	partitions, err := ReadPartitions(path)
 	if err != nil {
 		return err
 	}
@@ -91,9 +109,7 @@ func Merge(path string) error {
 	gLexicon := iradix.New[*inverseindex.GlobalTerm]().Txn()
 
 	for _, partition := range partitions {
-		if !partition.IsDir() {
-			continue
-		}
+
 		folder := filepath.Join(path, partition.Name())
 		f, err := os.Open(filepath.Join(folder, "terms.bin"))
 		if err != nil {
