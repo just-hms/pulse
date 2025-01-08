@@ -18,7 +18,7 @@ curl -o data/dataset.tar.gz https://msmarco.blob.core.windows.net/msmarcoranking
 ## indexing
 
 ```shell
-tar xOf data/dataset.tar.gz | pulse spimi
+tar xOf dataset.tar.gz | pulse spimi
 ```
 
 ## benchmark
