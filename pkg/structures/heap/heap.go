@@ -41,6 +41,9 @@ func (h *Heap[T]) Add(ts ...T) {
 // Resize changes the capacity of the underlying array.
 // If the new size is smaller, elements are truncated.
 func (h *Heap[T]) Resize(size int) {
+	if cap(h.content) < size {
+		return
+	}
 	h.content = h.content[:size]
 }
 
