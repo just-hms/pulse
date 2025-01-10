@@ -29,8 +29,8 @@ func TestPush(t *testing.T) {
 	// Validate heap structure after pushes
 	req.Equal(3, h.Size(), "heap should contain 3 elements")
 
-	peek, err := h.Peek()
-	req.NoError(err)
+	peek, ok := h.Peek()
+	req.True(ok)
 	req.Equal(Integer(5), peek, "top element should be the smallest (5)")
 }
 
@@ -64,14 +64,14 @@ func TestPeek(t *testing.T) {
 
 	// Initialize the Heap
 	h := heap.New[Integer]()
-	_, err := h.Peek()
-	req.Error(err)
+	_, ok := h.Peek()
+	req.True(ok)
 
 	h.Add(10, 5, 20)
 
 	// Peek at the top element without removing it
-	min, err := h.Peek()
-	req.NoError(err)
+	min, ok := h.Peek()
+	req.False(ok)
 	req.Equal(Integer(5), min, "peeked element should be the smallest (5)")
 
 	// Ensure size remains the same

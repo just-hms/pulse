@@ -75,12 +75,12 @@ func (h *Heap[T]) Size() int {
 
 // Peek returns the top element of the heap without removing it.
 // Assumes the heap is not empty.
-func (h *Heap[T]) Peek() (T, error) {
+func (h *Heap[T]) Peek() (T, bool) {
 	if len(h.content) == 0 {
 		var zero T
-		return zero, errors.New("empty heap")
+		return zero, false
 	}
-	return h.content[0], nil
+	return h.content[0], true
 }
 
 // upHeap maintains the heap property by moving an element up.

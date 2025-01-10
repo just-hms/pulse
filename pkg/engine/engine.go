@@ -199,15 +199,16 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 			return int(a.DocumentID) - int(b.DocumentID)
 		})
 
-		peek, err := result.Peek()
-		if err == nil && result.Size() >= s.K && GetUpperScore(curSeeks) < peek.Score {
-			for _, s := range curSeeks {
-				s.Next()
-			}
-			// remove all finished seekers
-			seekers = slices.DeleteFunc(seekers, seeker.EOD)
-			continue
-		}
+		// todo: re-add this
+		// peek, ok := result.Peek()
+		// if ok && result.Size() >= s.K && GetUpperScore(curSeeks) < peek.Score {
+		// 	for _, s := range curSeeks {
+		// 		s.Next()
+		// 	}
+		// 	// remove all finished seekers
+		// 	seekers = slices.DeleteFunc(seekers, seeker.EOD)
+		// 	continue
+		// }
 
 		doc := &DocInfo{
 			ID: curSeeks[0].DocumentID,

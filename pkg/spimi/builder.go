@@ -86,10 +86,8 @@ func (b *builder) Encode(path string) error {
 		}
 
 		s, _ := stats.Load(f)
-		s.CollectionSize += uint32(b.Collection.Len())
-
-		err = s.Dump(f)
-		if err != nil {
+		s.Update(uint32(b.Collection.Len()), b.Collection.AvgDocumentSize)
+		if err := s.Dump(f); err != nil {
 			return err
 		}
 

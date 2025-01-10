@@ -10,9 +10,15 @@ type Stats struct {
 	AverageDocumentSize float64
 }
 
-func (c *Stats) Dump(w io.Writer) error {
+func (s *Stats) Dump(w io.Writer) error {
 	enc := gob.NewEncoder(w)
-	return enc.Encode(c)
+	return enc.Encode(s)
+}
+
+func (s *Stats) Update(collectionSize uint32, averageDocumentSize float64) {
+	s.AverageDocumentSize = (s.AverageDocumentSize*float64(s.CollectionSize) + averageDocumentSize*float64(collectionSize)) /
+		float64(s.CollectionSize+collectionSize)
+	s.CollectionSize += collectionSize
 }
 
 func Load(r io.Reader) (*Stats, error) {
