@@ -1,13 +1,14 @@
 package inverseindex
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 	"unsafe"
 )
 
 type Document struct {
-	No   [8]byte
+	no   [8]byte
 	Size uint32
 }
 
@@ -20,9 +21,14 @@ func NewDocument(no string, size int) Document {
 	}
 	d := Document{
 		Size: uint32(size),
+		no:   [8]byte{0, 0, 0, 0, 0, 0, 0, 0},
 	}
-	copy(d.No[:], no)
+	copy(d.no[:], no)
 	return d
+}
+
+func (doc *Document) No() string {
+	return string(bytes.Trim(doc.no[:], "\x00"))
 }
 
 func (doc *Document) Encode(w io.Writer) error {
@@ -30,7 +36,7 @@ func (doc *Document) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := binary.Write(w, binary.LittleEndian, doc.No); err != nil {
+	if err := binary.Write(w, binary.LittleEndian, doc.no); err != nil {
 		return err
 	}
 	return nil
@@ -46,7 +52,7 @@ func (doc *Document) Decode(ID uint32, rs io.ReaderAt) error {
 	}
 	doc.Size = binary.LittleEndian.Uint32(buf[:])
 
-	if _, err := rs.ReadAt(doc.No[:], offset+4); err != nil {
+	if _, err := rs.ReadAt(doc.no[:], offset+4); err != nil {
 		return err
 	}
 	return nil

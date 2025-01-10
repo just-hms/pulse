@@ -18,5 +18,5 @@ func (doc *DocInfo) Cmp(other *DocInfo) int {
 }
 
 func (doc *DocInfo) String() string {
-	return fmt.Sprintf("{%f %s}", doc.Score, string(doc.Document.No[:]))
+	return fmt.Sprintf("{%f %s}", doc.Score, doc.No())
 }

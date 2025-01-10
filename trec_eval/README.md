@@ -1,5 +1,10 @@
 # trec_eval
 
+resorces:
+
+- https://microsoft.github.io/msmarco/TREC-Deep-Learning-2020
+- https://github.com/usnistgov/trec_eval
+
 Used for evaluating an ad hoc retrieval run, given the results file and a standard set of judged results.
 
 ## Installing

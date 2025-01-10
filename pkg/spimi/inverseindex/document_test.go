@@ -32,6 +32,6 @@ func TestDocumentIO(t *testing.T) {
 	err = doc.Decode(2, f)
 	req.NoError(err)
 
-	req.Equal([8]byte{'4'}, doc.No)
+	req.Equal("4", doc.No())
 	req.Equal(uint32(13), doc.Size)
 }
