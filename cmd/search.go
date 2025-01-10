@@ -1,8 +1,13 @@
 package cmd
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
+	"iter"
 	"log"
+	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,9 +22,38 @@ var (
 	interactiveFlag bool
 )
 
+func InteractiveArgs() iter.Seq2[int, string] {
+	i := 0
+	reader := bufio.NewReader(os.Stdin)
+
+	return func(yield func(int, string) bool) {
+		defer func() {
+			i++
+		}()
+		for {
+			fmt.Print("> ")
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				return
+			}
+			line = strings.TrimSpace(line)
+			if !yield(i, line) {
+				return
+			}
+		}
+	}
+}
+
 var searchCmd = &cobra.Command{
 	Use:   "search",
 	Short: "do a query",
+	Args:  cobra.RangeArgs(0, 1),
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 && !interactiveFlag {
+			return errors.New("either write a query or use -i flag")
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// Parse the metric
@@ -33,9 +67,13 @@ var searchCmd = &cobra.Command{
 			return err
 		}
 
-		// Process each search argument
-		for _, arg := range args {
+		queries := slices.All(args)
+		if interactiveFlag {
+			queries = InteractiveArgs()
+		}
 
+		// Process each search argument
+		for _, arg := range queries {
 			start := time.Now()
 			// Perform the search
 			res, err := e.Search(arg, &engine.Settings{
