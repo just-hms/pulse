@@ -37,7 +37,7 @@ func GetUpperScore(seekers []*seeker.Seeker) float64 {
 	return res
 }
 
-func CalculateDocInfo(doc *DocInfo, seekers []*seeker.Seeker, stats *stats.Stats, s *Settings) {
+func calculateDocInfo(doc *DocInfo, seekers []*seeker.Seeker, stats *stats.Stats, s *Settings) {
 	switch s.Metric {
 	case TFIDF:
 		score := 0.0
@@ -217,7 +217,7 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 			return err
 		}
 
-		CalculateDocInfo(doc, curSeeks, stats, s)
+		calculateDocInfo(doc, curSeeks, stats, s)
 		result.Add(doc)
 
 		if result.Size() >= s.K*2 {

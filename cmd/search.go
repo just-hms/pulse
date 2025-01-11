@@ -147,7 +147,6 @@ var searchCmd = &cobra.Command{
 				return err
 			}
 
-			// Print the first result
 			for rank, doc := range res {
 				// result file format:
 				// <query_id> 0 <doc_id> <rank> <score> <run_id>

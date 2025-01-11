@@ -35,7 +35,6 @@ func (doc *Document) Encode(w io.Writer) error {
 	if err := binary.Write(w, binary.LittleEndian, doc.Size); err != nil {
 		return err
 	}
-
 	if err := binary.Write(w, binary.LittleEndian, doc.no); err != nil {
 		return err
 	}

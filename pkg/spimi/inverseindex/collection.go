@@ -35,7 +35,9 @@ func (c *Collection) Encode(w io.Writer) error {
 	defer enc.Flush()
 
 	for _, doc := range c.data {
-		doc.Encode(enc)
+		if err := doc.Encode(enc); err != nil {
+			return err
+		}
 	}
 	return nil
 }

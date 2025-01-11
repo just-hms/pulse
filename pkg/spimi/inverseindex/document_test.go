@@ -29,9 +29,19 @@ func TestDocumentIO(t *testing.T) {
 	req.NoError(err)
 
 	doc := inverseindex.Document{}
-	err = doc.Decode(2, f)
-	req.NoError(err)
 
-	req.Equal("4", doc.No())
-	req.Equal(uint32(13), doc.Size)
+	{
+		err := doc.Decode(2, f)
+		req.NoError(err)
+
+		req.Equal("4", doc.No())
+		req.Equal(uint32(13), doc.Size)
+	}
+	{
+		err := doc.Decode(3, f)
+		req.NoError(err)
+
+		req.Equal("19", doc.No())
+		req.Equal(uint32(24), doc.Size)
+	}
 }

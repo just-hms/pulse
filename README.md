@@ -30,7 +30,6 @@ pprof -http=localhost:8080 pulse.prof
 
 ## todo
 
-- [] add conjunctive & disjunctive
-- [] add compression
-- [] maybe use some embeddings for scoring function
+- [] add conjunctive & disjunctive (add tests)
+- [] add compression (maybe not)
 - [] implement `nextGEQ`
