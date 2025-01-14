@@ -41,12 +41,14 @@ func (s *Seeker) Next() error {
 		return errors.New("cannot read further")
 	}
 
-	if _, err := s.postings.ReadAt(s.buf[:], int64(s.cur)); err != nil {
+	pos := s.start + s.cur
+
+	if _, err := s.postings.ReadAt(s.buf[:], int64(pos)); err != nil {
 		return fmt.Errorf("error reading postingFile: %v", err)
 	}
 	s.DocumentID = binary.LittleEndian.Uint32(s.buf[:])
 
-	if _, err := s.freqs.ReadAt(s.buf[:], int64(s.cur)); err != nil {
+	if _, err := s.freqs.ReadAt(s.buf[:], int64(pos)); err != nil {
 		return fmt.Errorf("error reading freqFile: %v", err)
 	}
 	s.Frequence = binary.LittleEndian.Uint32(s.buf[:])

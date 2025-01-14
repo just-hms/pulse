@@ -6,7 +6,6 @@ import (
 	"encoding/gob"
 	"io"
 	"iter"
-	"log"
 	"slices"
 
 	"maps"
@@ -78,13 +77,6 @@ func (l Lexicon) EncodeTerms(w io.Writer, terms []string) error {
 
 		// todo: specify the bit position in future
 		span := uint32(len(lx.Posting)) * 4
-
-		// todo: remove
-		{
-			if term == "a" {
-				log.Println(cur, cur+span)
-			}
-		}
 
 		t := withkey.WithKey[LocalTerm]{
 			Key: term,
