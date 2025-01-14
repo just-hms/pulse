@@ -63,7 +63,6 @@ func Load(path string) (*engine, error) {
 
 	statsFile, err := os.Open(filepath.Join(path, "stats.bin"))
 	if err != nil {
-		fmt.Println(statsFile)
 		return nil, err
 	}
 
@@ -219,7 +218,6 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 			for ; !seeker.EOD(testSeek); testSeek.Next() {
 				s = append(s, fmt.Sprint(testSeek.DocumentID))
 			}
-			fmt.Println(testSeek.Term.Key, s, testSeek.Term.Value.StartOffset, testSeek.Term.Value.EndOffset)
 		}
 	}
 
