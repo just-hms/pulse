@@ -134,6 +134,7 @@ var searchCmd = &cobra.Command{
 			break
 		case singleQueryFlag != "":
 			queries = slices.All([]query{{value: singleQueryFlag}})
+			break
 		}
 
 		// Process each search argument
