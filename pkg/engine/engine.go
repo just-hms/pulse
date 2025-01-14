@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -29,7 +28,8 @@ type engine struct {
 	stats         *stats.Stats
 }
 
-func GetUpperScore(seekers []*seeker.Seeker) float64 {
+// todo: for BM25 add upperscore directly into the term
+func GetUpperScore(seekers []*seeker.Seeker, m Metric) float64 {
 	res := 0.0
 	for _, s := range seekers {
 		res += float64(s.Term.Value.MaxDocFrequence)
@@ -60,7 +60,6 @@ func calculateDocInfo(doc *DocInfo, seekers []*seeker.Seeker, stats *stats.Stats
 }
 
 func Load(path string) (*engine, error) {
-
 	statsFile, err := os.Open(filepath.Join(path, "stats.bin"))
 	if err != nil {
 		return nil, err
@@ -173,51 +172,20 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		return err
 	}
 
-	// todo: remove this
-	// docs := &set.Set[string]{}
-	// for i := 0; i < 1; i++ {
-	// 	doc := &DocInfo{
-	// 		ID: uint32(i),
-	// 	}
-	// 	if err := doc.Decode(doc.ID, docReader); err != nil {
-	// 		panic(err)
-	// 	}
-	// 	if docs.Has(doc.No()) {
-	// 		panic("duplicate")
-	// 	}
-	// 	if doc.No() != fmt.Sprint(i) {
-	// 		panic("cazzi")
-	// 	}
-	// 	docs.Add(doc.No())
-	// }
-	// if !docs.Has("0") {
-	// 	panic("cazzi")
-	// }
-
-	// todo: do something if the term is not present in the index
 	qLocalTerms := make([]withkey.WithKey[inverseindex.LocalTerm], 0)
 	for _, qTerm := range qGlobalTerms {
-		if t, ok := e.localLexicons[i].Get([]byte(qTerm.Key)); ok {
+		t, ok := e.localLexicons[i].Get([]byte(qTerm.Key))
+		if ok {
 			qLocalTerms = append(qLocalTerms, withkey.WithKey[inverseindex.LocalTerm]{
 				Key:   qTerm.Key,
 				Value: *t,
 			})
+			continue
 		}
-	}
 
-	// todo: debug, print each posting list
-	{
-		seekers := make([]*seeker.Seeker, 0, len(qLocalTerms))
-		for _, t := range qLocalTerms {
-			s := seeker.NewSeeker(lexReaders.Posting, lexReaders.Freqs, t)
-			s.Next()
-			seekers = append(seekers, s)
-		}
-		for _, testSeek := range seekers {
-			s := []string{}
-			for ; !seeker.EOD(testSeek); testSeek.Next() {
-				s = append(s, fmt.Sprint(testSeek.DocumentID))
-			}
+		// if a term is not present in any document and the query is conjuctive return 0 results
+		if s.Conjunctive {
+			return nil
 		}
 	}
 
@@ -236,16 +204,25 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 			return int(a.DocumentID) - int(b.DocumentID)
 		})
 
-		// todo: re-add this
-		// peek, ok := result.Peek()
-		// if ok && result.Size() >= s.K && GetUpperScore(curSeeks) < peek.Score {
-		// 	for _, s := range curSeeks {
-		// 		s.Next()
-		// 	}
-		// 	// remove all finished seekers
-		// 	seekers = slices.DeleteFunc(seekers, seeker.EOD)
-		// 	continue
-		// }
+		// if the current document does not contain all the terms go to the next
+		if len(curSeeks) != len(qLocalTerms) && s.Conjunctive {
+			for _, s := range curSeeks {
+				s.Next()
+			}
+			// remove all finished seekers
+			seekers = slices.DeleteFunc(seekers, seeker.EOD)
+			continue
+		}
+
+		peek, ok := result.Peek()
+		if ok && result.Size() >= s.K && GetUpperScore(curSeeks, s.Metric) < peek.Score {
+			for _, s := range curSeeks {
+				s.Next()
+			}
+			// remove all finished seekers
+			seekers = slices.DeleteFunc(seekers, seeker.EOD)
+			continue
+		}
 
 		doc := &DocInfo{
 			ID: curSeeks[0].DocumentID,

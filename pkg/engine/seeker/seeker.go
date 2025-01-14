@@ -35,7 +35,6 @@ func NewSeeker(postings, freqs io.ReaderAt, t withkey.WithKey[inverseindex.Local
 	return s
 }
 
-// todo: maybe return the values????
 func (s *Seeker) Next() error {
 	if EOD(s) {
 		return errors.New("cannot read further")

@@ -22,7 +22,7 @@ const (
 
 const (
 	sleep                  = time.Second
-	memoryThreshold uint64 = 1.5 * GB
+	memoryThreshold uint64 = 3 * GB
 )
 
 func Parse(r ChunkReader, numWorkers int, path string) error {

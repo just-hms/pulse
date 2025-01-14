@@ -14,7 +14,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// todo: maybe use radix ??
 type Lexicon map[string]*LexVal
 
 type LexVal struct {
@@ -75,7 +74,6 @@ func (l Lexicon) EncodeTerms(w io.Writer, terms []string) error {
 	for _, term := range terms {
 		lx := l[term]
 
-		// todo: specify the bit position in future
 		span := uint32(len(lx.Posting)) * 4
 
 		t := withkey.WithKey[LocalTerm]{

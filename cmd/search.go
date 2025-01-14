@@ -20,6 +20,7 @@ var (
 	kFlag           uint
 	metricFlag      string
 	interactiveFlag bool
+	conjuctiveFlag  bool
 	singleQueryFlag string
 	fileFlag        string
 )
@@ -140,8 +141,9 @@ var searchCmd = &cobra.Command{
 			start := time.Now()
 			// Perform the search
 			res, err := e.Search(query.value, &engine.Settings{
-				K:      int(kFlag),
-				Metric: metric,
+				K:           int(kFlag),
+				Metric:      metric,
+				Conjunctive: conjuctiveFlag,
 			})
 			if err != nil {
 				return err
@@ -166,6 +168,7 @@ func init() {
 	searchCmd.Flags().UintVarP(&kFlag, "doc2ret", "k", 10, "number of documents to be returned")
 
 	searchCmd.Flags().BoolVarP(&interactiveFlag, "interactive", "i", false, "interactive search")
+	searchCmd.Flags().BoolVarP(&conjuctiveFlag, "conjunctive", "c", false, "search in conjunctive mode")
 	searchCmd.Flags().StringVarP(&singleQueryFlag, "query", "q", "", "single search")
 	searchCmd.Flags().StringVarP(&fileFlag, "file", "f", "", "add a queries file")
 
