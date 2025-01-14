@@ -1,6 +1,7 @@
 package seeker_test
 
 import (
+	"log"
 	"testing"
 
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
@@ -44,21 +45,33 @@ func TestSeeker(t *testing.T) {
 		aTerm, ok := localLexicon.Get([]byte(key))
 		req.True(ok)
 
-		seeker := seeker.NewSeeker(
+		log.Println("aaaaa", aTerm.StartOffset, aTerm.EndOffset)
+
+		s := seeker.NewSeeker(
 			f.Posting, f.Freqs,
 			withkey.WithKey[inverseindex.LocalTerm]{Key: key, Value: aTerm},
 		)
 
-		err = seeker.Next()
-		req.NoError(err)
+		log.Println("aaaaa", s.Term.Value.StartOffset, s.Term.Value.EndOffset)
 
-		req.Equal(uint32(0), seeker.DocumentID)
-		req.Equal(uint32(2), seeker.Frequence)
+		got := map[uint32]uint32{}
 
-		err = seeker.Next()
+		err = s.Next()
 		req.NoError(err)
-		req.Equal(uint32(2), seeker.DocumentID)
-		req.Equal(uint32(16), seeker.Frequence)
+		got[s.DocumentID] = s.Frequence
+		err = s.Next()
+		req.NoError(err)
+		got[s.DocumentID] = s.Frequence
+
+		req.True(seeker.EOD(s))
+		err = s.Next()
+		req.Error(err)
+
+		exp := map[uint32]uint32{
+			0: 2,
+			2: 16,
+		}
+		req.Equal(exp, got)
 	}
 
 }

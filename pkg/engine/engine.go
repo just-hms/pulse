@@ -174,6 +174,28 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		return err
 	}
 
+	// todo: remove this
+	// docs := &set.Set[string]{}
+	// for i := 0; i < 1; i++ {
+	// 	doc := &DocInfo{
+	// 		ID: uint32(i),
+	// 	}
+	// 	if err := doc.Decode(doc.ID, docReader); err != nil {
+	// 		panic(err)
+	// 	}
+	// 	if docs.Has(doc.No()) {
+	// 		panic("duplicate")
+	// 	}
+	// 	if doc.No() != fmt.Sprint(i) {
+	// 		panic("cazzi")
+	// 	}
+	// 	docs.Add(doc.No())
+	// }
+	// if !docs.Has("0") {
+	// 	panic("cazzi")
+	// }
+
+	// todo: do something if the term is not present in the index
 	qLocalTerms := make([]withkey.WithKey[inverseindex.LocalTerm], 0)
 	for _, qTerm := range qGlobalTerms {
 		if t, ok := e.localLexicons[i].Get([]byte(qTerm.Key)); ok {
@@ -181,6 +203,23 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 				Key:   qTerm.Key,
 				Value: *t,
 			})
+		}
+	}
+
+	// todo: debug, print each posting list
+	{
+		seekers := make([]*seeker.Seeker, 0, len(qLocalTerms))
+		for _, t := range qLocalTerms {
+			s := seeker.NewSeeker(lexReaders.Posting, lexReaders.Freqs, t)
+			s.Next()
+			seekers = append(seekers, s)
+		}
+		for _, testSeek := range seekers {
+			s := []string{}
+			for ; !seeker.EOD(testSeek); testSeek.Next() {
+				s = append(s, fmt.Sprint(testSeek.DocumentID))
+			}
+			fmt.Println(testSeek.Term.Key, s, testSeek.Term.Value.StartOffset, testSeek.Term.Value.EndOffset)
 		}
 	}
 
@@ -228,7 +267,6 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		for _, s := range curSeeks {
 			s.Next()
 		}
-		// remove all finished seekers
 		seekers = slices.DeleteFunc(seekers, seeker.EOD)
 	}
 	result.Resize(s.K)

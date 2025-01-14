@@ -2,6 +2,7 @@ package seeker
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 
@@ -34,17 +35,22 @@ func NewSeeker(postings, freqs io.ReaderAt, t withkey.WithKey[inverseindex.Local
 	return s
 }
 
+// todo: maybe return the values????
 func (s *Seeker) Next() error {
-	if _, err := s.postings.ReadAt(s.buf[:], int64(s.cur)*4); err != nil {
+	if EOD(s) {
+		return errors.New("cannot read further")
+	}
+
+	if _, err := s.postings.ReadAt(s.buf[:], int64(s.cur)); err != nil {
 		return fmt.Errorf("error reading postingFile: %v", err)
 	}
 	s.DocumentID = binary.LittleEndian.Uint32(s.buf[:])
 
-	if _, err := s.freqs.ReadAt(s.buf[:], int64(s.cur)*4+4); err != nil {
+	if _, err := s.freqs.ReadAt(s.buf[:], int64(s.cur)); err != nil {
 		return fmt.Errorf("error reading freqFile: %v", err)
 	}
 	s.Frequence = binary.LittleEndian.Uint32(s.buf[:])
-	s.cur += 8
+	s.cur += 4
 	return nil
 }
 

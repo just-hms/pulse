@@ -94,7 +94,7 @@ func (b *builder) Encode(path string) error {
 		defer f.Close()
 	}
 
-	// make this better, maybe use a double buffer
+	// todo: make this better, maybe use a double buffer
 	b.Lexicon.Clear()
 	b.Collection.Clear()
 	return nil

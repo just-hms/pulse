@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"io"
 	"iter"
+	"log"
 	"slices"
 
 	"maps"
@@ -77,6 +78,14 @@ func (l Lexicon) EncodeTerms(w io.Writer, terms []string) error {
 
 		// todo: specify the bit position in future
 		span := uint32(len(lx.Posting)) * 4
+
+		// todo: remove
+		{
+			if term == "a" {
+				log.Println(cur, cur+span)
+			}
+		}
+
 		t := withkey.WithKey[LocalTerm]{
 			Key: term,
 			Value: LocalTerm{
@@ -101,8 +110,7 @@ func (l Lexicon) EncodePostings(w io.Writer, terms []string) error {
 	for _, term := range terms {
 		lx := l[term]
 		for _, p := range lx.Posting {
-			err := binary.Write(enc, binary.LittleEndian, p)
-			if err != nil {
+			if err := binary.Write(enc, binary.LittleEndian, p); err != nil {
 				return err
 			}
 		}
@@ -117,8 +125,7 @@ func (l Lexicon) EncodeFreqs(w io.Writer, terms []string) error {
 	for _, term := range terms {
 		lx := l[term]
 		for _, p := range lx.Frequencies {
-			err := binary.Write(enc, binary.LittleEndian, p)
-			if err != nil {
+			if err := binary.Write(enc, binary.LittleEndian, p); err != nil {
 				return err
 			}
 		}
