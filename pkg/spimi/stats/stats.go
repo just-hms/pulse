@@ -6,8 +6,8 @@ import (
 )
 
 type Stats struct {
-	CollectionSize      uint32
-	AverageDocumentSize float64
+	N   uint32  // collection size
+	ADL float64 // average document length
 }
 
 func (s *Stats) Dump(w io.Writer) error {
@@ -16,9 +16,9 @@ func (s *Stats) Dump(w io.Writer) error {
 }
 
 func (s *Stats) Update(collectionSize uint32, averageDocumentSize float64) {
-	s.AverageDocumentSize = (s.AverageDocumentSize*float64(s.CollectionSize) + averageDocumentSize*float64(collectionSize)) /
-		float64(s.CollectionSize+collectionSize)
-	s.CollectionSize += collectionSize
+	s.ADL = (s.ADL*float64(s.N) + averageDocumentSize*float64(collectionSize)) /
+		float64(s.N+collectionSize)
+	s.N += collectionSize
 }
 
 func Load(r io.Reader) (*Stats, error) {

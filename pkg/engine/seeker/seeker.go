@@ -15,8 +15,8 @@ type Seeker struct {
 
 	buf [4]byte
 
-	DocumentID uint32
-	Frequence  uint32
+	DocumentID        uint32
+	DocumentFrequency uint32
 
 	start, cur, end uint32
 
@@ -50,7 +50,7 @@ func (s *Seeker) Next() error {
 	if _, err := s.freqs.ReadAt(s.buf[:], int64(pos)); err != nil {
 		return fmt.Errorf("error reading freqFile: %v", err)
 	}
-	s.Frequence = binary.LittleEndian.Uint32(s.buf[:])
+	s.DocumentFrequency = binary.LittleEndian.Uint32(s.buf[:])
 	s.cur += 4
 	return nil
 }

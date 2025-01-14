@@ -28,14 +28,16 @@ type engine struct {
 	stats         *stats.Stats
 }
 
-func GetUpperScore(seekers []*seeker.Seeker, s *Settings) float64 {
+func GetUpperScore(seekers []*seeker.Seeker, stats *stats.Stats, s *Settings) float64 {
 	switch s.Metric {
 	case TFIDF:
-		res := 0.0
+		score := 0.0
 		for _, s := range seekers {
-			res += float64(s.Term.Value.MaxDocFrequence)
+			TF := (float64(s.DocumentFrequency) / float64(s.Term.Value.MaxDocFrequence))
+			IDF := math.Log(float64(stats.N) / float64(s.DocumentFrequency))
+			score += TF * IDF
 		}
-		return res
+		return score
 	case BM25:
 		// todo: implement upperscore for bm25
 		return math.MaxFloat64
@@ -44,25 +46,24 @@ func GetUpperScore(seekers []*seeker.Seeker, s *Settings) float64 {
 	}
 }
 
-func calculateDocInfo(doc *DocInfo, seekers []*seeker.Seeker, stats *stats.Stats, s *Settings) {
+func score(doc *DocInfo, seekers []*seeker.Seeker, stats *stats.Stats, s *Settings) {
 	switch s.Metric {
 	case TFIDF:
 		score := 0.0
 		for _, s := range seekers {
-			TF := (float64(s.Frequence) / float64(doc.Size))
-			IDF := math.Log(float64(stats.CollectionSize) / float64(s.Frequence))
-			score += TF * IDF
+			TF := float64(s.DocumentFrequency)
+			IDF := math.Log(float64(stats.N) / float64(s.Term.Value.DocumentFrequency))
+			score += (1 + math.Log(TF)) * IDF
 		}
 		doc.Score = score
-		break
 	case BM25:
 		score := 0.0
 		for _, s := range seekers {
-			IDF := math.Log((float64(stats.CollectionSize)-float64(s.Term.Value.Appearences)+0.5)/(float64(s.Term.Value.Appearences)+0.5) + 1)
-			score += IDF * (float64(s.Frequence)*(BM25_k1+1)/float64(s.Frequence) + BM25_k1*(1-BM25_b+BM25_b*(float64(doc.Size)/stats.AverageDocumentSize)))
+			TF := float64(s.DocumentFrequency)
+			IDF := math.Log(float64(stats.N) / float64(s.Term.Value.DocumentFrequency))
+			score += TF / (BM25_k1*((1-BM25_b)+BM25_b*(float64(doc.Size)/stats.ADL)) + TF) * IDF
 		}
 		doc.Score = score
-		break
 	default:
 		panic("metric not implemented")
 	}
@@ -224,7 +225,7 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		}
 
 		peek, ok := result.Peek()
-		if ok && result.Size() >= s.K && GetUpperScore(curSeeks, s) < peek.Score {
+		if ok && result.Size() >= s.K && GetUpperScore(curSeeks, stats, s) < peek.Score {
 			for _, s := range curSeeks {
 				s.Next()
 			}
@@ -240,7 +241,7 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 			return err
 		}
 
-		calculateDocInfo(doc, curSeeks, stats, s)
+		score(doc, curSeeks, stats, s)
 		result.Add(doc)
 
 		if result.Size() >= s.K*2 {

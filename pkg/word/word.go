@@ -4,11 +4,11 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"sync"
 
 	_ "embed"
 
 	"github.com/blevesearch/go-porterstemmer"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/text/transform"
 )
 
@@ -35,16 +35,14 @@ func StopWordsRemoval(tokens []string) []string {
 }
 
 func Stem(tokens []string) {
-	wg := sync.WaitGroup{}
-	wg.Add(len(tokens))
+	wg := errgroup.Group{}
 	for i, t := range tokens {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() error {
 			tokens[i] = string(
 				porterstemmer.StemWithoutLowerCasing([]rune(t)),
 			)
-		}()
+			return nil
+		})
 	}
-
 	wg.Wait()
 }
