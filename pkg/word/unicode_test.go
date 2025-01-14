@@ -7,7 +7,6 @@ import (
 
 	"github.com/just-hms/pulse/pkg/word"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/text/transform"
 )
 
 func TestNormalizer(t *testing.T) {
@@ -117,8 +116,7 @@ func TestNormalizer(t *testing.T) {
 99	(1841 - 1904) Contrary to legend, AntonÃ­n DvoÅÃ¡k (September 8, 1841 - May 1, 1904) was not born in poverty. His father was an innkeeper and butcher, as well as an amateur musician. The father not only put no obstacles in the way of his son's pursuit of a musical career, he and his wife positively encouraged the boy.
 `
 
-	got, _, err := transform.String(word.UnicodeNormalizer(), text)
-	req.NoError(err)
+	got := word.Clean(text)
 
 	ok := slices.ContainsFunc([]rune(got), func(r rune) bool {
 		return unicode.IsPrint(r) || r == '\n'

@@ -1,51 +1,36 @@
 package word
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
 
+	_ "embed"
+
 	"github.com/blevesearch/go-porterstemmer"
+	"golang.org/x/text/transform"
 )
 
-var punctuationRemover = strings.NewReplacer(
-	".", " ", ",", " ", "!", " ", "?", " ",
-	";", " ", ":", " ", "'", " ", "\" ", " ",
-	"(", " ", ")", " ", "[", " ", "]", " ",
-	"{", " ", "}", " ",
+var (
+	punctuationRemover = regexp.MustCompile(`[^\w\s]+`) // Match punctuation (non-alphanumeric, non-whitespace)
+	htmlTags           = regexp.MustCompile(`<[^>]*>`)  // Match HTML tags
 )
+
+func Clean(s string) string {
+	s, _, _ = transform.String(unicodeNormalizer(), s)
+	s = htmlTags.ReplaceAllString(s, "")
+	s = punctuationRemover.ReplaceAllString(s, "")
+	return s
+}
 
 func Tokenize(s string) []string {
-	s = punctuationRemover.Replace(s)
 	return strings.Fields(s)
 }
 
-// isStopword checks if a word is a stopword.
-func isStopword(word string) bool {
-	switch word {
-	case "the", "and", "in", "of",
-		"to", "a", "for", "is",
-		"on", "that", "by", "this",
-		"with", "i", "you", "it",
-		"not", "or", "be", "are",
-		"from", "at", "as", "your",
-		"all", "have", "new", "more",
-		"an", "was", "we", "will",
-		"can", "if", "my", "has",
-		"but", "our", "one", "do", "no",
-		"he", "up", "may", "out",
-		"use", "any", "see", "only",
-		"so", "his", "when", "here", "who",
-		"now", "get", "pm", "view", "am",
-		"been", "how", "were", "me", "some":
-		return true
-	}
-	return false
-}
-
 func StopWordsRemoval(tokens []string) []string {
-	return slices.DeleteFunc(tokens, func(el string) bool {
-		return isStopword(el)
+	return slices.DeleteFunc(tokens, func(token string) bool {
+		return stopWords.Has(token)
 	})
 }
 
