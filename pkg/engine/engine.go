@@ -33,9 +33,9 @@ func GetUpperScore(seekers []*seeker.Seeker, stats *stats.Stats, s *Settings) fl
 	case TFIDF:
 		score := 0.0
 		for _, s := range seekers {
-			TF := (float64(s.DocumentFrequency) / float64(s.Term.Value.MaxDocFrequence))
-			IDF := math.Log(float64(stats.N) / float64(s.DocumentFrequency))
-			score += TF * IDF
+			TF := float64(s.TermFrequency)
+			IDF := math.Log(float64(stats.N) / float64(s.Term.Value.MaxTermFrequency))
+			score += (1 + math.Log(TF)) * IDF
 		}
 		return score
 	case BM25:
@@ -51,7 +51,7 @@ func score(doc *DocInfo, seekers []*seeker.Seeker, stats *stats.Stats, s *Settin
 	case TFIDF:
 		score := 0.0
 		for _, s := range seekers {
-			TF := float64(s.DocumentFrequency)
+			TF := float64(s.TermFrequency)
 			IDF := math.Log(float64(stats.N) / float64(s.Term.Value.DocumentFrequency))
 			score += (1 + math.Log(TF)) * IDF
 		}
@@ -59,7 +59,7 @@ func score(doc *DocInfo, seekers []*seeker.Seeker, stats *stats.Stats, s *Settin
 	case BM25:
 		score := 0.0
 		for _, s := range seekers {
-			TF := float64(s.DocumentFrequency)
+			TF := float64(s.TermFrequency)
 			IDF := math.Log(float64(stats.N) / float64(s.Term.Value.DocumentFrequency))
 			score += TF / (BM25_k1*((1-BM25_b)+BM25_b*(float64(doc.Size)/stats.ADL)) + TF) * IDF
 		}

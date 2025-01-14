@@ -31,7 +31,7 @@ func (l Lexicon) Add(freqs map[string]uint32, docID uint32) {
 			}
 		}
 		lx := l[term]
-		lx.MaxDocFrequence = max(lx.MaxDocFrequence, frequence)
+		lx.MaxTermFrequency = max(lx.MaxTermFrequency, frequence)
 		lx.DocumentFrequency += 1
 		lx.Posting = append(lx.Posting, docID)
 		lx.Frequencies = append(lx.Frequencies, frequence)

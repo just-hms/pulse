@@ -2,7 +2,7 @@ package inverseindex
 
 type GlobalTerm struct {
 	DocumentFrequency uint32 // number of documents in which the term appears
-	MaxDocFrequence   uint32 // max frequence inside a document
+	MaxTermFrequency  uint32 // max frequence inside a document
 }
 
 type LocalTerm struct {

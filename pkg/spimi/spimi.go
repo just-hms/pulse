@@ -125,7 +125,6 @@ func Merge(path string) error {
 		// append values to gLexicon
 		for lk, lv := range radix.Values(lLexicon) {
 			if gv, ok := gLexicon.Get(lk); ok {
-				gv.Frequence += lv.Frequence
 				gv.DocumentFrequency += lv.DocumentFrequency
 			} else {
 				gLexicon.Insert(lk, lv)

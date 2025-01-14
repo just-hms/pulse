@@ -77,7 +77,7 @@ func TestSeeker(t *testing.T) {
 			for !seeker.EOD(s) {
 				err = s.Next()
 				req.NoError(err)
-				got[s.DocumentID] = s.DocumentFrequency
+				got[s.DocumentID] = s.TermFrequency
 			}
 
 			req.Equal(tt.exp, got, tt.key)
