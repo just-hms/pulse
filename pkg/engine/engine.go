@@ -143,12 +143,13 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 		return nil, err
 	}
 
-	result := &heap.Heap[*DocInfo]{Cap: 3}
+	result := &heap.Heap[*DocInfo]{Cap: s.K}
 	for _, res := range results {
 		result.Push(res.Values()...)
 	}
-
-	return result.Values(), nil
+	vals := result.Values()
+	slices.Reverse(vals)
+	return vals, nil
 }
 
 func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result *heap.Heap[*DocInfo]) error {

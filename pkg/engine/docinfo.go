@@ -14,7 +14,6 @@ type DocInfo struct {
 
 // Cmp implements heap.Orderable.
 func (doc *DocInfo) Cmp(other *DocInfo) bool {
-	// todo: check this better
 	return doc.Score < other.Score
 }
 
