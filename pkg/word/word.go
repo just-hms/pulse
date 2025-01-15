@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	punctuationRemover = regexp.MustCompile(`[^\w\s]+`) // Match punctuation (non-alphanumeric, non-whitespace)
-	htmlTags           = regexp.MustCompile(`<[^>]*>`)  // Match HTML tags
+	punctuationRemover = regexp.MustCompile(`[^\p{L}\p{N}\p{So}\s]+`)
+	htmlTags           = regexp.MustCompile(`<[^>]*>`)
 )
 
 func Clean(s string) string {

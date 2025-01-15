@@ -24,7 +24,7 @@ func TestTokenize(t *testing.T) {
 		{
 			"Punctuation",
 			"it's a test.",
-			[]string{"it", "s", "a", "test"},
+			[]string{"its", "a", "test"},
 		},
 
 		{
@@ -54,7 +54,8 @@ func TestTokenize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := word.Tokenize(tt.input)
+			cleaned := word.Clean(tt.input)
+			got := word.Tokenize(cleaned)
 			req.Equal(tt.exp, got)
 		})
 	}

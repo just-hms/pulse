@@ -10,24 +10,17 @@ import (
 
 type Integer int
 
-func (i Integer) Cmp(other Integer) int {
-	if i > other {
-		return 1
-	} else if i < other {
-		return -1
-	}
-	return 0
-}
+func (i Integer) Cmp(other Integer) bool { return i < other }
 
 func TestPush(t *testing.T) {
 	req := require.New(t)
 
 	// Initialize the Heap
 	h := &heap.Heap[Integer]{}
-	h.Add(10, 5, 20)
+	h.Push(10, 5, 20)
 
 	// Validate heap structure after pushes
-	req.Equal(3, h.Size(), "heap should contain 3 elements")
+	req.Equal(3, h.Len(), "heap should contain 3 elements")
 
 	peek, ok := h.Peek()
 	req.True(ok)
@@ -39,7 +32,7 @@ func TestPop(t *testing.T) {
 
 	// Initialize the Heap
 	h := &heap.Heap[Integer]{}
-	h.Add(10, 5, 20)
+	h.Push(10, 5, 20)
 
 	// Pop elements and validate order
 	min, ok := h.Pop()
@@ -67,7 +60,7 @@ func TestPeek(t *testing.T) {
 	_, ok := h.Peek()
 	req.False(ok)
 
-	h.Add(10, 5, 20)
+	h.Push(10, 5, 20)
 
 	// Peek at the top element without removing it
 	min, ok := h.Peek()
@@ -75,7 +68,7 @@ func TestPeek(t *testing.T) {
 	req.Equal(Integer(5), min, "peeked element should be the smallest (5)")
 
 	// Ensure size remains the same
-	req.Equal(3, h.Size(), "heap size should remain 3 after peek")
+	req.Equal(3, h.Len(), "heap size should remain 3 after peek")
 }
 
 func TestSize(t *testing.T) {
@@ -83,38 +76,24 @@ func TestSize(t *testing.T) {
 
 	// Initialize the Heap
 	h := &heap.Heap[Integer]{}
-	require.Equal(0, h.Size(), "new heap should be empty")
+	require.Equal(0, h.Len(), "new heap should be empty")
 
-	h.Add(10, 5, 20)
+	h.Push(10, 5, 20)
 
-	require.Equal(3, h.Size(), "heap should contain 3 elements after 3 pushes")
+	require.Equal(3, h.Len(), "heap should contain 3 elements after 3 pushes")
 
 	// Pop one element and check size
 	_, _ = h.Pop()
-	require.Equal(2, h.Size(), "heap should contain 2 elements after one pop")
-}
-
-func TestReSize(t *testing.T) {
-	require := require.New(t)
-
-	// Initialize the Heap
-	h := &heap.Heap[Integer]{}
-	require.Equal(0, h.Size(), "new heap should be empty")
-
-	h.Add(10, 5, 20)
-
-	require.Equal(3, h.Size(), "heap should contain 3 elements after 3 pushes")
-	h.Resize(2)
-	require.Equal(2, h.Size(), "heap should contain 2 elements after one pop")
+	require.Equal(2, h.Len(), "heap should contain 2 elements after one pop")
 }
 
 func TestValues(t *testing.T) {
 	require := require.New(t)
 
 	h := &heap.Heap[Integer]{}
-	require.Equal(0, h.Size(), "new heap should be empty")
+	require.Equal(0, h.Len(), "new heap should be empty")
 
-	h.Add(10, 5, 20, 100, -10, 200, 200)
+	h.Push(10, 5, 20, 100, -10, 200, 200)
 
 	v := h.Values()
 
@@ -124,10 +103,10 @@ func TestValues(t *testing.T) {
 func TestDifferentOrder(t *testing.T) {
 	require := require.New(t)
 
-	h := (&heap.Heap[Integer]{}).WithOrder(func(a, b Integer) int { return int(b) - int(a) })
-	require.Equal(0, h.Size(), "new heap should be empty")
+	h := (&heap.Heap[Integer]{}).WithOrder(func(a, b Integer) bool { return int(a) < int(b) })
+	require.Equal(0, h.Len(), "new heap should be empty")
 
-	h.Add(10, 5, 20, 100, -10, 200, 200)
+	h.Push(10, 5, 20, 100, -10, 200, 200)
 
 	v := h.Values()
 	slices.Reverse(v)
@@ -135,25 +114,15 @@ func TestDifferentOrder(t *testing.T) {
 	require.True(slices.IsSorted(v), "heap is not sorted %v", v)
 }
 
-func TestValuesAfterResize(t *testing.T) {
+func TestMaxSize(t *testing.T) {
 	require := require.New(t)
 
-	h := &heap.Heap[Integer]{}
-	require.Equal(0, h.Size(), "new heap should be empty")
+	h := &heap.Heap[Integer]{Cap: 3}
+	require.Equal(0, h.Len(), "new heap should be empty")
 
-	h.Add(10, 5, 20, 100, -10, 200, 200)
+	h.Push(10, 5, 20, 100, -10, 200, 300)
 
 	v := h.Values()
-	require.Len(v, 7)
-	require.True(slices.IsSorted(v), "heap is not sorted %v", v)
 
-	h.Resize(8)
-	v = h.Values()
-	require.Len(v, 7)
-	require.True(slices.IsSorted(v), "heap is not sorted %v", v)
-
-	h.Resize(4)
-	v = h.Values()
-	require.Len(v, 4)
-	require.True(slices.IsSorted(v), "heap is not sorted %v", v)
+	require.Equal([]Integer{-10, 5, 10}, v)
 }

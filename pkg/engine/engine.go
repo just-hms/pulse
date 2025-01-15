@@ -28,24 +28,6 @@ type engine struct {
 	stats         *stats.Stats
 }
 
-func GetUpperScore(seekers []*seeker.Seeker, stats *stats.Stats, s *Settings) float64 {
-	switch s.Metric {
-	case TFIDF:
-		score := 0.0
-		for _, s := range seekers {
-			TF := float64(s.TermFrequency)
-			IDF := math.Log(float64(stats.N) / float64(s.Term.Value.MaxTermFrequency))
-			score += (1 + math.Log(TF)) * IDF
-		}
-		return score
-	case BM25:
-		// todo: implement upperscore for bm25
-		return math.MaxFloat64
-	default:
-		panic("metric not implemented")
-	}
-}
-
 func score(doc *DocInfo, seekers []*seeker.Seeker, stats *stats.Stats, s *Settings) {
 	switch s.Metric {
 	case TFIDF:
@@ -149,10 +131,10 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 
 	results := make([]heap.Heap[*DocInfo], len(e.partititions))
 	var wg errgroup.Group
-
 	for i := range e.partititions {
 		// 	launch the query for each partition
 		wg.Go(func() error {
+			results[i].Cap = s.K
 			return e.searchPartition(i, qGlobalTerms, e.stats, s, &results[i])
 		})
 	}
@@ -161,11 +143,10 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 		return nil, err
 	}
 
-	result := heap.Heap[*DocInfo]{}
+	result := &heap.Heap[*DocInfo]{Cap: 3}
 	for _, res := range results {
-		result.Add(res.Values()...)
+		result.Push(res.Values()...)
 	}
-	result.Resize(s.K)
 
 	return result.Values(), nil
 }
@@ -224,16 +205,6 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 			continue
 		}
 
-		peek, ok := result.Peek()
-		if ok && result.Size() >= s.K && GetUpperScore(curSeeks, stats, s) < peek.Score {
-			for _, s := range curSeeks {
-				s.Next()
-			}
-			// remove all finished seekers
-			seekers = slices.DeleteFunc(seekers, seeker.EOD)
-			continue
-		}
-
 		doc := &DocInfo{
 			ID: curSeeks[0].DocumentID,
 		}
@@ -242,11 +213,7 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		}
 
 		score(doc, curSeeks, stats, s)
-		result.Add(doc)
-
-		if result.Size() >= s.K*2 {
-			result.Resize(s.K)
-		}
+		result.Push(doc)
 
 		// seek to the next
 		for _, s := range curSeeks {
@@ -254,6 +221,5 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		}
 		seekers = slices.DeleteFunc(seekers, seeker.EOD)
 	}
-	result.Resize(s.K)
 	return nil
 }
