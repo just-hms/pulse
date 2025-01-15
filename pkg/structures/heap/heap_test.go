@@ -20,7 +20,7 @@ func TestPush(t *testing.T) {
 	h.Push(10, 5, 20)
 
 	// Validate heap structure after pushes
-	req.Equal(3, h.Len(), "heap should contain 3 elements")
+	req.Equal(3, h.Size(), "heap should contain 3 elements")
 
 	peek, ok := h.Peek()
 	req.True(ok)
@@ -68,7 +68,7 @@ func TestPeek(t *testing.T) {
 	req.Equal(Integer(5), min, "peeked element should be the smallest (5)")
 
 	// Ensure size remains the same
-	req.Equal(3, h.Len(), "heap size should remain 3 after peek")
+	req.Equal(3, h.Size(), "heap size should remain 3 after peek")
 }
 
 func TestSize(t *testing.T) {
@@ -76,22 +76,22 @@ func TestSize(t *testing.T) {
 
 	// Initialize the Heap
 	h := &heap.Heap[Integer]{}
-	require.Equal(0, h.Len(), "new heap should be empty")
+	require.Equal(0, h.Size(), "new heap should be empty")
 
 	h.Push(10, 5, 20)
 
-	require.Equal(3, h.Len(), "heap should contain 3 elements after 3 pushes")
+	require.Equal(3, h.Size(), "heap should contain 3 elements after 3 pushes")
 
 	// Pop one element and check size
 	_, _ = h.Pop()
-	require.Equal(2, h.Len(), "heap should contain 2 elements after one pop")
+	require.Equal(2, h.Size(), "heap should contain 2 elements after one pop")
 }
 
 func TestValues(t *testing.T) {
 	require := require.New(t)
 
 	h := &heap.Heap[Integer]{}
-	require.Equal(0, h.Len(), "new heap should be empty")
+	require.Equal(0, h.Size(), "new heap should be empty")
 
 	h.Push(10, 5, 20, 100, -10, 200, 200)
 
@@ -103,8 +103,8 @@ func TestValues(t *testing.T) {
 func TestDifferentOrder(t *testing.T) {
 	require := require.New(t)
 
-	h := (&heap.Heap[Integer]{}).WithOrder(func(a, b Integer) bool { return int(a) < int(b) })
-	require.Equal(0, h.Len(), "new heap should be empty")
+	h := (&heap.Heap[Integer]{}).WithOrder(func(a, b Integer) bool { return int(a) > int(b) })
+	require.Equal(0, h.Size(), "new heap should be empty")
 
 	h.Push(10, 5, 20, 100, -10, 200, 200)
 
@@ -117,12 +117,12 @@ func TestDifferentOrder(t *testing.T) {
 func TestMaxSize(t *testing.T) {
 	require := require.New(t)
 
-	h := &heap.Heap[Integer]{Cap: 3}
-	require.Equal(0, h.Len(), "new heap should be empty")
+	h := (&heap.Heap[Integer]{Cap: 3}).WithOrder(func(a, b Integer) bool { return int(a) > int(b) })
+	require.Equal(0, h.Size(), "new heap should be empty")
 
 	h.Push(10, 5, 20, 100, -10, 200, 300)
 
 	v := h.Values()
-
+	slices.Reverse(v)
 	require.Equal([]Integer{-10, 5, 10}, v)
 }
