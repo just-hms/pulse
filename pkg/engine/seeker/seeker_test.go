@@ -1,7 +1,6 @@
 package seeker_test
 
 import (
-	"log"
 	"testing"
 
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
@@ -73,7 +72,6 @@ func TestSeeker(t *testing.T) {
 
 			got := map[uint32]uint32{}
 
-			log.Println(s.Term, s.Term.Value.StartOffset, s.Term.Value.EndOffset)
 			for !seeker.EOD(s) {
 				err = s.Next()
 				req.NoError(err)
