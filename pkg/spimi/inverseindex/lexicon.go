@@ -10,6 +10,7 @@ import (
 
 	"maps"
 
+	"github.com/just-hms/pulse/pkg/compression/deltavarint"
 	"github.com/just-hms/pulse/pkg/compression/unary"
 	"github.com/just-hms/pulse/pkg/structures/withkey"
 )
@@ -121,7 +122,11 @@ func encodeFrequencies(lx *LexVal, w io.Writer, compression bool) (int, error) {
 	return written, nil
 }
 
-func encodePosting(lx *LexVal, w io.Writer, _ bool) (int, error) {
+func encodePosting(lx *LexVal, w io.Writer, compression bool) (int, error) {
+	if compression {
+		w = deltavarint.NewWriter(w)
+	}
+
 	buf := [4]byte{}
 
 	written := 0

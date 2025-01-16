@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/just-hms/pulse/pkg/compression/deltavarint"
 	"github.com/just-hms/pulse/pkg/compression/unary"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
 	"github.com/just-hms/pulse/pkg/structures/withkey"
@@ -31,6 +32,7 @@ func NewSeeker(postings, freqs io.ReaderAt, t withkey.WithKey[inverseindex.Local
 	}
 	if compression {
 		s.freqs = unary.NewReader(s.freqs, 1)
+		s.postings = deltavarint.NewReader(s.postings)
 	}
 	return s
 }
