@@ -32,7 +32,7 @@ func TestWriter(t *testing.T) {
 			f := &bytes.Buffer{}
 			buf := make([]byte, 8)
 
-			w := unary.NewWriter(f)
+			w := unary.NewWriter(f, 0)
 
 			// Write the test values
 			for _, value := range tt.values {
@@ -75,7 +75,7 @@ func TestWriterBytesCount(t *testing.T) {
 			f := &bytes.Buffer{}
 			buf := make([]byte, 8)
 
-			w := unary.NewWriter(f)
+			w := unary.NewWriter(f, 0)
 
 			sum := 0
 			for _, v := range tt.values {
@@ -117,7 +117,7 @@ func TestReader(t *testing.T) {
 			_, err := f.Write(tt.data)
 			req.NoError(err)
 
-			r := unary.NewReader(f)
+			r := unary.NewReader(f, 0)
 
 			got := []uint64{}
 
@@ -144,7 +144,7 @@ func TestDifferenSize(t *testing.T) {
 	f := &bytes.Buffer{}
 	buf := make([]byte, 4)
 
-	w := unary.NewWriter(f)
+	w := unary.NewWriter(f, 0)
 	exp := uint32(12)
 	binary.LittleEndian.PutUint32(buf, exp)
 	_, err := w.Write(buf)
@@ -155,10 +155,62 @@ func TestDifferenSize(t *testing.T) {
 
 	req.Equal([]byte{0b11111111, 0b11110111}, f.Bytes())
 
-	r := unary.NewReader(f)
+	r := unary.NewReader(f, 0)
 	_, err = r.Read(buf)
 	req.NoError(err)
 
 	got := binary.LittleEndian.Uint32(buf)
 	req.Equal(exp, got)
+}
+
+func TestMiniumum(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	// test with 0 as minimum
+	{
+		f := &bytes.Buffer{}
+		buf := make([]byte, 8)
+
+		exp := uint64(9)
+		w := unary.NewWriter(f, 0)
+		binary.LittleEndian.PutUint64(buf, exp)
+		n, err := w.Write(buf)
+		req.NoError(err)
+		req.Equal(2, n)
+
+		err = w.Flush()
+		req.NoError(err)
+
+		req.Equal([]byte{0b11111111, 0b10111111}, f.Bytes())
+
+		r := unary.NewReader(f, 0)
+		r.Read(buf)
+		v := binary.LittleEndian.Uint64(buf)
+		req.Equal(exp, v)
+	}
+
+	// test with 1 as minimum
+	{
+		f := &bytes.Buffer{}
+		buf := make([]byte, 8)
+
+		exp := uint64(9)
+		w := unary.NewWriter(f, 1)
+		binary.LittleEndian.PutUint64(buf, exp)
+		n, err := w.Write(buf)
+		req.NoError(err)
+		req.Equal(2, n)
+
+		err = w.Flush()
+		req.NoError(err)
+
+		req.Equal([]byte{0b11111111, 0b01111111}, f.Bytes())
+
+		r := unary.NewReader(f, 1)
+		r.Read(buf)
+		v := binary.LittleEndian.Uint64(buf)
+		req.Equal(exp, v)
+	}
+
 }

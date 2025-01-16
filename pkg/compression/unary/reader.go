@@ -7,6 +7,7 @@ import (
 
 type Reader struct {
 	io.Reader
+	minimum uint
 
 	padded [8]byte
 
@@ -14,10 +15,11 @@ type Reader struct {
 	count  uint8 // Current bit position in the buffer
 }
 
-func NewReader(r io.Reader) *Reader {
+func NewReader(r io.Reader, m uint) *Reader {
 	return &Reader{
-		Reader: r,
-		padded: [8]byte{},
+		Reader:  r,
+		padded:  [8]byte{},
+		minimum: m,
 	}
 }
 
@@ -51,7 +53,7 @@ func (ubr *Reader) readUnary() (uint64, error) {
 		count++
 	}
 
-	return count, nil
+	return count + uint64(ubr.minimum), nil
 }
 
 // readBit reads a single bit from the buffer

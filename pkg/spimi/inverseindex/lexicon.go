@@ -101,7 +101,7 @@ func (l Lexicon) Encode(loc LexiconFiles, compression bool) error {
 
 func encodeFrequencies(lx *LexVal, w io.Writer, compression bool) (int, error) {
 	if compression {
-		uw := unary.NewWriter(w)
+		uw := unary.NewWriter(w, 1)
 		defer uw.Flush()
 		w = uw
 	}

@@ -8,6 +8,7 @@ import (
 // Writer encodes data into unary format and writes as bits
 type Writer struct {
 	io.Writer
+	minimum uint
 
 	padded [8]byte
 
@@ -15,10 +16,11 @@ type Writer struct {
 	count  uint8 // Number of bits currently in buffer
 }
 
-func NewWriter(w io.Writer) *Writer {
+func NewWriter(w io.Writer, m uint) *Writer {
 	return &Writer{
-		Writer: w,
-		padded: [8]byte{},
+		Writer:  w,
+		padded:  [8]byte{},
+		minimum: m,
 	}
 }
 
@@ -34,7 +36,7 @@ func (ubw *Writer) Write(data []byte) (int, error) {
 		written++
 	}
 
-	for i := uint64(0); i < result; i++ {
+	for i := uint64(0); i < result-uint64(ubw.minimum); i++ {
 		n, err := ubw.writeBit(1)
 		if err != nil {
 			return 0, err

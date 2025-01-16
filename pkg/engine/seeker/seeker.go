@@ -30,7 +30,7 @@ func NewSeeker(postings, freqs io.ReaderAt, t withkey.WithKey[inverseindex.Local
 		freqs:    io.NewSectionReader(freqs, int64(t.Value.FreqStart), int64(t.Value.PostLength)),
 	}
 	if compression {
-		s.freqs = unary.NewReader(s.freqs)
+		s.freqs = unary.NewReader(s.freqs, 1)
 	}
 	return s
 }
