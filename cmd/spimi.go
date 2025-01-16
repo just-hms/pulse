@@ -60,6 +60,6 @@ func init() {
 	spimiCmd.Flags().UintVarP(&workersFlag, "workers", "w", 16, "number of workers indexing the dataset")
 	spimiCmd.Flags().UintVarP(&chunkSizeFlag, "chunk", "c", 50_000, "reader chunk size")
 
-	spimiCmd.Flags().BoolVar(&noStopWordsFlag, "no-stopwords", false, "remove stopwords")
+	spimiCmd.Flags().BoolVar(&noStopWordsFlag, "no-stopwords", false, "remove stopwords removal")
 	spimiCmd.Flags().BoolVar(&noStemmingFlag, "no-stemming", false, "remove stemming")
 }
