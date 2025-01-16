@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"fmt"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -69,10 +71,13 @@ func Load(path string) (*engine, error) {
 	}
 
 	globalLexicon := iradix.New[*inverseindex.GlobalTerm]()
-	err = radix.Decode(globalTermsFile, &globalLexicon)
-	if err != nil {
+	if err := radix.Decode(globalTermsFile, &globalLexicon); err != nil {
 		return nil, err
 	}
+
+	// todo: remove
+	log.Println("checkpoint")
+	fmt.Scanln()
 
 	partitions, err := spimi.ReadPartitions(path)
 	if err != nil {
