@@ -20,14 +20,16 @@ type builder struct {
 	mu         sync.Mutex
 
 	dumpCounter uint32
+	stats.IndexingSettings
 }
 
-func newBuilder() *builder {
+func newBuilder(s stats.IndexingSettings) *builder {
 	return &builder{
-		Lexicon:     inverseindex.Lexicon{},
-		Collection:  inverseindex.Collection{},
-		mu:          sync.Mutex{},
-		dumpCounter: 0,
+		Lexicon:          inverseindex.Lexicon{},
+		Collection:       inverseindex.Collection{},
+		mu:               sync.Mutex{},
+		dumpCounter:      0,
+		IndexingSettings: s,
 	}
 }
 
@@ -86,6 +88,7 @@ func (b *builder) Encode(path string) error {
 		}
 
 		s, _ := stats.Load(f)
+		s.IndexingSettings = b.IndexingSettings
 		s.Update(uint32(b.Collection.Len()), b.Collection.AvgDocumentSize)
 		if err := s.Dump(f); err != nil {
 			return err

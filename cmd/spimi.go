@@ -7,12 +7,15 @@ import (
 	"github.com/just-hms/pulse/config"
 	"github.com/just-hms/pulse/pkg/spimi"
 	"github.com/just-hms/pulse/pkg/spimi/readers"
+	"github.com/just-hms/pulse/pkg/spimi/stats"
 	"github.com/spf13/cobra"
 )
 
 var (
-	workersFlag   uint
-	chunkSizeFlag uint
+	workersFlag     uint
+	chunkSizeFlag   uint
+	noStopWordsFlag bool
+	noStemmingFlag  bool
 )
 
 var spimiCmd = &cobra.Command{
@@ -35,8 +38,12 @@ var spimiCmd = &cobra.Command{
 		}
 
 		msMarcoReader := readers.NewMsMarco(bufio.NewReader(f), int(chunkSizeFlag))
+		settings := stats.IndexingSettings{
+			Stemming:         !noStemmingFlag,
+			StopWordsRemoval: !noStopWordsFlag,
+		}
 
-		if err := spimi.Parse(msMarcoReader, int(workersFlag), config.DATA_FOLDER); err != nil {
+		if err := spimi.Parse(msMarcoReader, int(workersFlag), config.DATA_FOLDER, settings); err != nil {
 			return err
 		}
 
@@ -52,4 +59,7 @@ func init() {
 
 	spimiCmd.Flags().UintVarP(&workersFlag, "workers", "w", 16, "number of workers indexing the dataset")
 	spimiCmd.Flags().UintVarP(&chunkSizeFlag, "chunk", "c", 50_000, "reader chunk size")
+
+	spimiCmd.Flags().BoolVar(&noStopWordsFlag, "no-stopwords", false, "remove stopwords")
+	spimiCmd.Flags().BoolVar(&noStemmingFlag, "no-stemming", false, "remove stemming")
 }

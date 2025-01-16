@@ -16,7 +16,7 @@ func (h *Heap[T]) WithOrder(cmp func(a, b T) bool) *Heap[T] {
 	return h
 }
 
-// Add inserts elements into the heap and maintains the heap property.
+// Add inserts elements into the heap and maintains the heap property
 func (h *Heap[T]) Push(ts ...T) {
 	if h.cmp == nil {
 		h.cmp = func(a, b T) bool { return a.Cmp(b) }
@@ -35,8 +35,7 @@ func (h *Heap[T]) Push(ts ...T) {
 	}
 }
 
-// SortedValues returns the values in the heap in sorted order.
-// It does so by creating a temporary copy of the heap and popping elements.
+// SortedValues returns the values in the heap in sorted order
 func (h *Heap[T]) Values() []T {
 	// Create a copy of the heap content
 	tempHeap := Heap[T]{
@@ -58,7 +57,7 @@ func (h *Heap[T]) Size() int {
 	return len(h.content)
 }
 
-// Peek returns the top element of the heap without removing it.
+// Peek returns the top element of the heap without removing it
 // Assumes the heap is not empty.
 func (h *Heap[T]) Peek() (T, bool) {
 	if len(h.content) == 0 {
@@ -68,7 +67,7 @@ func (h *Heap[T]) Peek() (T, bool) {
 	return h.content[0], true
 }
 
-// upHeap maintains the heap property by moving an element up.
+// upHeap maintains the heap property by moving an element up
 func (h *Heap[T]) upHeap(index int) {
 	for index > 0 {
 		parent := (index - 1) / 2
@@ -80,7 +79,7 @@ func (h *Heap[T]) upHeap(index int) {
 	}
 }
 
-// downHeap maintains the heap property by moving an element down.
+// downHeap maintains the heap property by moving an element down
 func (h *Heap[T]) downHeap(index int) {
 	lastIndex := len(h.content) - 1
 	for {

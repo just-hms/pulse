@@ -25,7 +25,8 @@ type engine struct {
 	globalLexicon *iradix.Tree[*inverseindex.GlobalTerm]
 	localLexicons []*iradix.Tree[*inverseindex.LocalTerm]
 	partititions  []string
-	stats         *stats.Stats
+
+	stats *stats.Stats
 }
 
 func score(doc *DocInfo, seekers []*seeker.Seeker, stats *stats.Stats, s *Settings) {
@@ -117,7 +118,7 @@ func Load(path string) (*engine, error) {
 }
 
 func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
-	qTokens := preprocess.GetTokens(query)
+	qTokens := preprocess.GetTokens(query, e.stats.IndexingSettings)
 
 	qGlobalTerms := make([]withkey.WithKey[inverseindex.GlobalTerm], 0)
 	for _, qToken := range qTokens {

@@ -5,7 +5,11 @@ import (
 	"io"
 )
 
+type IndexingSettings struct {
+	Stemming, StopWordsRemoval bool
+}
 type Stats struct {
+	IndexingSettings
 	N   uint32  // collection size
 	ADL float64 // average document length
 }

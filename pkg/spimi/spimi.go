@@ -10,6 +10,7 @@ import (
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
+	"github.com/just-hms/pulse/pkg/spimi/stats"
 	"github.com/just-hms/pulse/pkg/structures/radix"
 	"golang.org/x/sync/errgroup"
 )
@@ -25,12 +26,12 @@ const (
 	memoryThreshold uint64 = 3 * GB
 )
 
-func Parse(r ChunkReader, numWorkers int, path string) error {
+func Parse(r ChunkReader, numWorkers int, path string, s stats.IndexingSettings) error {
 
 	var (
 		workers  errgroup.Group
 		dumper   errgroup.Group
-		b        = newBuilder()
+		b        = newBuilder(s)
 		memStats runtime.MemStats
 	)
 
@@ -79,7 +80,7 @@ func Parse(r ChunkReader, numWorkers int, path string) error {
 		}
 		workers.Go(func() error {
 			for _, doc := range chunk {
-				tokens := preprocess.GetTokens(doc.Content)
+				tokens := preprocess.GetTokens(doc.Content, b.IndexingSettings)
 				freqs := make(map[string]uint32, len(tokens)/2)
 				for _, term := range tokens {
 					if _, ok := freqs[term]; !ok {
