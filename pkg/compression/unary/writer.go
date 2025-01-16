@@ -25,25 +25,39 @@ func NewWriter(w io.Writer) *Writer {
 // Write encodes the input as unary compression and writes to the underlying writer
 func (ubw *Writer) Write(data []byte) (int, error) {
 	copy(ubw.padded[:len(data)], data)
-
 	result := binary.LittleEndian.Uint64(ubw.padded[:])
 
+	written := 0
+
+	// start with 1 because the last flush is not counted
+	if ubw.count == 0 {
+		written++
+	}
+
 	for i := uint64(0); i < result; i++ {
-		if err := ubw.writeBit(1); err != nil {
+		n, err := ubw.writeBit(1)
+		if err != nil {
 			return 0, err
 		}
+		written += n
 	}
 
 	// Write terminating `0`
-	if err := ubw.writeBit(0); err != nil {
+	n, err := ubw.writeBit(0)
+	if err != nil {
 		return 0, err
 	}
 
-	return len(data), nil
+	written += n
+
+	if ubw.count == 0 {
+		written--
+	}
+	return written, nil
 }
 
 // writeBit writes a single bit to the buffer
-func (ubw *Writer) writeBit(bit int) error {
+func (ubw *Writer) writeBit(bit int) (int, error) {
 	if bit != 0 {
 		ubw.set()
 	}
@@ -51,14 +65,14 @@ func (ubw *Writer) writeBit(bit int) error {
 
 	// If the buffer is full (8 bits), write it to the writer
 	if ubw.count < 8 {
-		return nil
+		return 0, nil
 	}
 
 	if err := ubw.Flush(); err != nil {
-		return err
+		return 0, err
 	}
 
-	return nil
+	return 1, nil
 }
 
 func (ubw *Writer) set() {

@@ -12,10 +12,11 @@ import (
 )
 
 var (
-	workersFlag     uint
-	chunkSizeFlag   uint
-	noStopWordsFlag bool
-	noStemmingFlag  bool
+	workersFlag       uint
+	chunkSizeFlag     uint
+	noStopWordsFlag   bool
+	noStemmingFlag    bool
+	noCompressionFlag bool
 )
 
 var spimiCmd = &cobra.Command{
@@ -41,6 +42,7 @@ var spimiCmd = &cobra.Command{
 		settings := stats.IndexingSettings{
 			Stemming:         !noStemmingFlag,
 			StopWordsRemoval: !noStopWordsFlag,
+			Compression:      !noCompressionFlag,
 		}
 
 		if err := spimi.Parse(msMarcoReader, int(workersFlag), config.DATA_FOLDER, settings); err != nil {
@@ -60,6 +62,7 @@ func init() {
 	spimiCmd.Flags().UintVarP(&workersFlag, "workers", "w", 16, "number of workers indexing the dataset")
 	spimiCmd.Flags().UintVarP(&chunkSizeFlag, "chunk", "c", 50_000, "reader chunk size")
 
+	spimiCmd.Flags().BoolVar(&noCompressionFlag, "no-compression", false, "compress the posting list and term frequencies")
 	spimiCmd.Flags().BoolVar(&noStopWordsFlag, "no-stopwords", false, "remove stopwords removal")
 	spimiCmd.Flags().BoolVar(&noStemmingFlag, "no-stemming", false, "remove stemming")
 }

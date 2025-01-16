@@ -28,7 +28,7 @@ func TestSeeker(t *testing.T) {
 		req.NoError(err)
 		defer f.Close()
 
-		err = lex.Encode(f)
+		err = lex.Encode(f, false)
 		req.NoError(err)
 	}
 	{
@@ -68,6 +68,7 @@ func TestSeeker(t *testing.T) {
 			s := seeker.NewSeeker(
 				f.Posting, f.Freqs,
 				withkey.WithKey[inverseindex.LocalTerm]{Key: tt.key, Value: aTerm},
+				false,
 			)
 
 			got := map[uint32]uint32{}

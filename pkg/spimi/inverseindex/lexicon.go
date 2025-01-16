@@ -10,8 +10,8 @@ import (
 
 	"maps"
 
+	"github.com/just-hms/pulse/pkg/compression/unary"
 	"github.com/just-hms/pulse/pkg/structures/withkey"
-	"golang.org/x/sync/errgroup"
 )
 
 type Lexicon map[string]*LexVal
@@ -46,78 +46,93 @@ func (l Lexicon) Terms() iter.Seq[string] {
 	return maps.Keys(l)
 }
 
-func (l Lexicon) Encode(loc LexiconFiles) error {
-	var wg errgroup.Group
-
+func (l Lexicon) Encode(loc LexiconFiles, compression bool) error {
 	terms := slices.Collect(l.Terms())
 
-	wg.Go(func() error {
-		return l.EncodeTerms(loc.Terms, terms)
-	})
+	termEnc := gob.NewEncoder(loc.Terms)
 
-	wg.Go(func() error {
-		return l.EncodePostings(loc.Posting, terms)
-	})
+	freqEnc := bufio.NewWriter(loc.Freqs)
+	defer freqEnc.Flush()
 
-	wg.Go(func() error {
-		return l.EncodeFreqs(loc.Freqs, terms)
-	})
+	postEnc := bufio.NewWriter(loc.Posting)
+	defer postEnc.Flush()
 
-	return wg.Wait()
-}
-
-func (l Lexicon) EncodeTerms(w io.Writer, terms []string) error {
-	enc := gob.NewEncoder(w)
-	var cur uint32 = 0
+	var (
+		freqStart = uint32(0)
+		postStart = uint32(0)
+	)
 
 	for _, term := range terms {
 		lx := l[term]
 
-		span := uint32(len(lx.Posting)) * 4
+		freqLength, err := encodeFrequencies(lx, freqEnc, compression)
+		if err != nil {
+			return err
+		}
+
+		postLength, err := encodePosting(lx, postEnc, compression)
+		if err != nil {
+			return err
+		}
 
 		t := withkey.WithKey[LocalTerm]{
 			Key: term,
 			Value: LocalTerm{
-				GlobalTerm:  lx.GlobalTerm,
-				StartOffset: cur,
-				EndOffset:   cur + span,
+				GlobalTerm: lx.GlobalTerm,
+				FreqStart:  freqStart,
+				FreqLength: uint32(freqLength),
+
+				PostStart:  postStart,
+				PostLength: uint32(postLength),
 			},
 		}
 
-		if err := enc.Encode(t); err != nil {
+		// encode term
+		if err := termEnc.Encode(t); err != nil {
 			return err
 		}
-		cur += span
+
+		freqStart += uint32(freqLength)
+		postStart += uint32(postLength)
 	}
+
 	return nil
 }
 
-func (l Lexicon) EncodePostings(w io.Writer, terms []string) error {
-	enc := bufio.NewWriter(w)
-	defer enc.Flush()
-
-	for _, term := range terms {
-		lx := l[term]
-		for _, p := range lx.Posting {
-			if err := binary.Write(enc, binary.LittleEndian, p); err != nil {
-				return err
-			}
-		}
+func encodeFrequencies(lx *LexVal, w io.Writer, compression bool) (int, error) {
+	if compression {
+		uw := unary.NewWriter(w)
+		defer uw.Flush()
+		w = uw
 	}
-	return nil
+
+	buf := [4]byte{}
+
+	written := 0
+	for _, p := range lx.Frequencies {
+		binary.LittleEndian.PutUint32(buf[:], p)
+		n, err := w.Write(buf[:])
+		if err != nil {
+			return 0, err
+		}
+		written += n
+	}
+
+	return written, nil
 }
 
-func (l Lexicon) EncodeFreqs(w io.Writer, terms []string) error {
-	enc := bufio.NewWriter(w)
-	defer enc.Flush()
+func encodePosting(lx *LexVal, w io.Writer, _ bool) (int, error) {
+	buf := [4]byte{}
 
-	for _, term := range terms {
-		lx := l[term]
-		for _, p := range lx.Frequencies {
-			if err := binary.Write(enc, binary.LittleEndian, p); err != nil {
-				return err
-			}
+	written := 0
+	for _, p := range lx.Posting {
+		binary.LittleEndian.PutUint32(buf[:], p)
+		n, err := w.Write(buf[:])
+		if err != nil {
+			return 0, err
 		}
+		written += n
 	}
-	return nil
+
+	return written, nil
 }

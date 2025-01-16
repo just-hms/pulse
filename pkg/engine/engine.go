@@ -184,7 +184,7 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 
 	seekers := make([]*seeker.Seeker, 0, len(qLocalTerms))
 	for _, t := range qLocalTerms {
-		s := seeker.NewSeeker(lexReaders.Posting, lexReaders.Freqs, t)
+		s := seeker.NewSeeker(lexReaders.Posting, lexReaders.Freqs, t, stats.Compression)
 		s.Next()
 		seekers = append(seekers, s)
 	}

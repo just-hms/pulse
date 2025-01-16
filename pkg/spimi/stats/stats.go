@@ -6,7 +6,7 @@ import (
 )
 
 type IndexingSettings struct {
-	Stemming, StopWordsRemoval bool
+	Stemming, StopWordsRemoval, Compression bool
 }
 type Stats struct {
 	IndexingSettings

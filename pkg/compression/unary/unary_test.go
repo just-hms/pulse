@@ -54,6 +54,44 @@ func TestWriter(t *testing.T) {
 	}
 }
 
+func TestWriterBytesCount(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		values []uint64
+	}{
+		{"Single Value", []uint64{5}},
+		{"Multiple Values", []uint64{1, 2, 3}},
+		{"Large Value", []uint64{20}},
+		{"Empty Input", []uint64{}},
+		{"Already aligned", []uint64{12, 2}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := require.New(t)
+			// Setup a f as the underlying writer
+			f := &bytes.Buffer{}
+			buf := make([]byte, 8)
+
+			w := unary.NewWriter(f)
+
+			sum := 0
+			for _, v := range tt.values {
+				binary.LittleEndian.PutUint64(buf, v)
+				n, err := w.Write(buf)
+				req.NoError(err)
+				sum += n
+			}
+			err := w.Flush()
+			req.NoError(err)
+
+			req.Equal(len(f.Bytes()), sum)
+		})
+	}
+}
+
 func TestReader(t *testing.T) {
 	t.Parallel()
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/just-hms/pulse/pkg/compression/unary"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
 	"github.com/just-hms/pulse/pkg/structures/withkey"
 )
@@ -22,11 +23,14 @@ type Seeker struct {
 	Term withkey.WithKey[inverseindex.LocalTerm]
 }
 
-func NewSeeker(postings, freqs io.ReaderAt, t withkey.WithKey[inverseindex.LocalTerm]) *Seeker {
+func NewSeeker(postings, freqs io.ReaderAt, t withkey.WithKey[inverseindex.LocalTerm], compression bool) *Seeker {
 	s := &Seeker{
 		Term:     t,
-		postings: io.NewSectionReader(postings, int64(t.Value.StartOffset), int64(t.Value.EndOffset)-int64(t.Value.StartOffset)),
-		freqs:    io.NewSectionReader(freqs, int64(t.Value.StartOffset), int64(t.Value.EndOffset)-int64(t.Value.StartOffset)),
+		postings: io.NewSectionReader(postings, int64(t.Value.PostStart), int64(t.Value.PostLength)),
+		freqs:    io.NewSectionReader(freqs, int64(t.Value.FreqStart), int64(t.Value.PostLength)),
+	}
+	if compression {
+		s.freqs = unary.NewReader(s.freqs)
 	}
 	return s
 }
@@ -53,7 +57,12 @@ func (s *Seeker) Next() error {
 }
 
 func (s *Seeker) String() string {
-	return fmt.Sprintf("{%s %d:%d}", s.Term.Key, s.Term.Value.StartOffset, s.Term.Value.EndOffset)
+	return fmt.Sprintf(
+		"{%s postings:[%d,%d], terms[%d,%d]}",
+		s.Term.Key,
+		s.Term.Value.PostStart, s.Term.Value.PostLength,
+		s.Term.Value.FreqStart, s.Term.Value.FreqLength,
+	)
 }
 
 // EOD (end of docs) returns true if the seeker has reached the end of the term's document

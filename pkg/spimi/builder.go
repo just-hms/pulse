@@ -73,7 +73,7 @@ func (b *builder) Encode(path string) error {
 			return err
 		}
 		defer f.Close()
-		return b.Lexicon.Encode(f)
+		return b.Lexicon.Encode(f, b.IndexingSettings.Compression)
 	})
 
 	if err := wg.Wait(); err != nil {

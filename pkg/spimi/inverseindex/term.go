@@ -7,6 +7,8 @@ type GlobalTerm struct {
 
 type LocalTerm struct {
 	GlobalTerm
-	StartOffset uint32
-	EndOffset   uint32
+
+	FreqStart, FreqLength uint32
+
+	PostStart, PostLength uint32
 }
