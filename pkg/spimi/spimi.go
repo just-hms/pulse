@@ -1,6 +1,7 @@
 package spimi
 
 import (
+	"encoding/gob"
 	"log"
 	"os"
 	"path/filepath"
@@ -8,10 +9,13 @@ import (
 	"time"
 
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
+	"github.com/just-hms/pulse/pkg/countwriter"
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
 	"github.com/just-hms/pulse/pkg/spimi/stats"
 	"github.com/just-hms/pulse/pkg/structures/radix"
+	"github.com/just-hms/pulse/pkg/structures/withkey"
+	"golang.org/x/exp/mmap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -107,38 +111,87 @@ func Merge(path string) error {
 		return err
 	}
 
-	gLexicon := iradix.New[*inverseindex.GlobalTerm]().Txn()
+	if len(partitions) == 0 {
+		return nil
+	}
+
+	gTermInfoF, err := os.Create(filepath.Join(path, "terms-info.bin"))
+	if err != nil {
+		return err
+	}
+	defer gTermInfoF.Close()
+
+	termsEnc := gob.NewEncoder(gTermInfoF)
+
+	gLexicon := iradix.New[uint32]().Txn()
+	cw := countwriter.NewWriter(gTermInfoF)
 
 	for _, partition := range partitions {
 
 		folder := filepath.Join(path, partition.Name())
-		f, err := os.Open(filepath.Join(folder, "terms.bin"))
+
+		termF, err := os.Open(filepath.Join(folder, "terms.bin"))
 		if err != nil {
 			return err
 		}
 
-		lLexicon := iradix.New[*inverseindex.GlobalTerm]()
-		err = radix.Decode(f, &lLexicon)
+		lTermInfoR, err := mmap.Open(filepath.Join(folder, "terms-info.bin"))
 		if err != nil {
+			return err
+		}
+
+		lLexicon := iradix.New[uint32]()
+
+		if err := radix.Decode(termF, &lLexicon); err != nil {
 			return err
 		}
 
 		// append values to gLexicon
-		for lk, lv := range radix.Values(lLexicon) {
-			if gv, ok := gLexicon.Get(lk); ok {
-				gv.DocumentFrequency += lv.DocumentFrequency
+		for key, lOffset := range radix.Values(lLexicon) {
+
+			lTerm, err := inverseindex.DecodeTerm[inverseindex.LocalTerm](lOffset, lTermInfoR)
+			if err != nil {
+				return err
+			}
+
+			gOffset, ok := gLexicon.Get(key)
+			if ok {
+				// get the global value
+				gTerm, err := inverseindex.DecodeTerm[inverseindex.GlobalTerm](gOffset, gTermInfoF)
+				if err != nil {
+					return err
+				}
+
+				gTerm.DocumentFrequency += lTerm.DocumentFrequency
+				gTerm.MaxTermFrequency = max(gTerm.MaxTermFrequency, lTerm.MaxTermFrequency)
+
+				if err := inverseindex.UpdateTerm(gTerm, gOffset, gTermInfoF); err != nil {
+					return err
+				}
 			} else {
-				gLexicon.Insert(lk, lv)
+				gTerm := &withkey.WithKey[inverseindex.GlobalTerm]{
+					Key: string(key),
+					Value: inverseindex.GlobalTerm{
+						DocumentFrequency: lTerm.DocumentFrequency,
+						MaxTermFrequency:  lTerm.MaxTermFrequency,
+					},
+				}
+
+				gLexicon.Insert(key, uint32(cw.Count))
+
+				if err := inverseindex.EncodeTerm(gTerm, termsEnc, cw); err != nil {
+					return err
+				}
 			}
 		}
 
 	}
 
-	f, err := os.Create(filepath.Join(path, "terms.bin"))
+	gTermF, err := os.Create(filepath.Join(path, "terms.bin"))
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer gTermF.Close()
 
-	return radix.Encode(f, gLexicon.Commit())
+	return radix.Encode(gTermF, gLexicon.Commit())
 }

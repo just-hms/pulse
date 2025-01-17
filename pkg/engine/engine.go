@@ -1,8 +1,7 @@
 package engine
 
 import (
-	"fmt"
-	"log"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -23,10 +22,13 @@ import (
 )
 
 type engine struct {
-	path          string
-	globalLexicon *iradix.Tree[*inverseindex.GlobalTerm]
-	localLexicons []*iradix.Tree[*inverseindex.LocalTerm]
-	partititions  []string
+	path string
+
+	gLexicon        *iradix.Tree[uint32]
+	gTermInfoReader io.ReaderAt
+
+	readers   []*spimi.SpimiReaders
+	lLexicons []*iradix.Tree[uint32]
 
 	stats *stats.Stats
 }
@@ -65,46 +67,46 @@ func Load(path string) (*engine, error) {
 		return nil, err
 	}
 
-	globalTermsFile, err := os.Open(filepath.Join(path, "terms.bin"))
+	gTermsF, err := os.Open(filepath.Join(path, "terms.bin"))
 	if err != nil {
 		return nil, err
 	}
-
-	globalLexicon := iradix.New[*inverseindex.GlobalTerm]()
-	if err := radix.Decode(globalTermsFile, &globalLexicon); err != nil {
+	globalLexicon := iradix.New[uint32]()
+	if err := radix.Decode(gTermsF, &globalLexicon); err != nil {
 		return nil, err
 	}
 
-	// todo: remove
-	log.Println("checkpoint")
-	fmt.Scanln()
+	gTermInfoReader, err := mmap.Open(filepath.Join(path, "terms-info.bin"))
+	if err != nil {
+		return nil, err
+	}
 
 	partitions, err := spimi.ReadPartitions(path)
 	if err != nil {
 		return nil, err
 	}
 
-	localLexicons := make([]*iradix.Tree[*inverseindex.LocalTerm], len(partitions))
-	partitionsName := make([]string, len(partitions))
+	readers := make([]*spimi.SpimiReaders, len(partitions))
+	lLexicons := make([]*iradix.Tree[uint32], len(partitions))
 
 	var wg errgroup.Group
 
 	for i, partition := range partitions {
 		// 	launch the query for each partition
 		wg.Go(func() error {
-			partitionsName[i] = filepath.Join(path, partition.Name())
-			f, err := inverseindex.OpenLexicon(partitionsName[i])
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-
-			localLexicons[i] = iradix.New[*inverseindex.LocalTerm]()
-			err = radix.Decode(f.Terms, &localLexicons[i])
+			partitionName := filepath.Join(path, partition.Name())
+			reader, err := spimi.OpenSpimiFiles(partitionName)
 			if err != nil {
 				return err
 			}
 
+			lLexicon := iradix.New[uint32]()
+			if err := radix.Decode(reader.LexiconReaders.Terms, &lLexicon); err != nil {
+				return err
+			}
+
+			lLexicons[i] = lLexicon
+			readers[i] = reader
 			return nil
 		})
 	}
@@ -114,11 +116,12 @@ func Load(path string) (*engine, error) {
 	}
 
 	return &engine{
-		path:          path,
-		globalLexicon: globalLexicon,
-		localLexicons: localLexicons,
-		partititions:  partitionsName,
-		stats:         stats,
+		path:            path,
+		gLexicon:        globalLexicon,
+		readers:         readers,
+		stats:           stats,
+		lLexicons:       lLexicons,
+		gTermInfoReader: gTermInfoReader,
 	}, nil
 }
 
@@ -127,17 +130,22 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 
 	qGlobalTerms := make([]withkey.WithKey[inverseindex.GlobalTerm], 0)
 	for _, qToken := range qTokens {
-		if t, ok := e.globalLexicon.Get([]byte(qToken)); ok {
+		if gOffset, ok := e.gLexicon.Get([]byte(qToken)); ok {
+			gTerm, err := inverseindex.DecodeTerm[inverseindex.GlobalTerm](gOffset, e.gTermInfoReader)
+			if err != nil {
+				return nil, err
+			}
+
 			qGlobalTerms = append(qGlobalTerms, withkey.WithKey[inverseindex.GlobalTerm]{
 				Key:   qToken,
-				Value: *t,
+				Value: *gTerm,
 			})
 		}
 	}
 
-	results := make([]heap.Heap[*DocInfo], len(e.partititions))
+	results := make([]heap.Heap[*DocInfo], len(e.readers))
 	var wg errgroup.Group
-	for i := range e.partititions {
+	for i := range e.readers {
 		// 	launch the query for each partition
 		wg.Go(func() error {
 			results[i].Cap = s.K
@@ -158,25 +166,27 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 	return vals, nil
 }
 
-func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result *heap.Heap[*DocInfo]) error {
-	lexReaders, err := inverseindex.OpenLexicon(e.partititions[i])
-	if err != nil {
-		return err
-	}
-	defer lexReaders.Close()
+func (e *engine) searchPartition(i int, qgTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result *heap.Heap[*DocInfo]) error {
+	readers := e.readers[i]
 
-	docReader, err := mmap.Open(filepath.Join(e.partititions[i], "doc.bin"))
-	if err != nil {
-		return err
-	}
-
-	qLocalTerms := make([]withkey.WithKey[inverseindex.LocalTerm], 0)
-	for _, qTerm := range qGlobalTerms {
-		t, ok := e.localLexicons[i].Get([]byte(qTerm.Key))
+	qlTerms := make([]withkey.WithKey[inverseindex.LocalTerm], 0)
+	for _, qgTerm := range qgTerms {
+		lOffest, ok := e.lLexicons[i].Get([]byte(qgTerm.Key))
 		if ok {
-			qLocalTerms = append(qLocalTerms, withkey.WithKey[inverseindex.LocalTerm]{
-				Key:   qTerm.Key,
-				Value: *t,
+			lTerm, err := inverseindex.DecodeTerm[inverseindex.LocalTerm](lOffest, readers.TermsInfo)
+			if err != nil {
+				return err
+			}
+
+			qlTerms = append(qlTerms, withkey.WithKey[inverseindex.LocalTerm]{
+				Key: qgTerm.Key,
+				Value: inverseindex.LocalTerm{
+					GlobalTerm: qgTerm.Value,
+					FreqStart:  lTerm.FreqStart,
+					FreqLength: lTerm.FreqLength,
+					PostStart:  lTerm.PostStart,
+					PostLength: lTerm.FreqLength,
+				},
 			})
 			continue
 		}
@@ -187,9 +197,9 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		}
 	}
 
-	seekers := make([]*seeker.Seeker, 0, len(qLocalTerms))
-	for _, t := range qLocalTerms {
-		s := seeker.NewSeeker(lexReaders.Posting, lexReaders.Freqs, t, stats.Compression)
+	seekers := make([]*seeker.Seeker, 0, len(qlTerms))
+	for _, qlTerm := range qlTerms {
+		s := seeker.NewSeeker(readers.Posting, readers.Freqs, qlTerm, stats.Compression)
 		s.Next()
 		seekers = append(seekers, s)
 	}
@@ -203,7 +213,7 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		})
 
 		// if the current document does not contain all the terms go to the next
-		if len(curSeeks) != len(qLocalTerms) && s.Conjunctive {
+		if len(curSeeks) != len(qlTerms) && s.Conjunctive {
 			for _, s := range curSeeks {
 				s.Next()
 			}
@@ -215,7 +225,7 @@ func (e *engine) searchPartition(i int, qGlobalTerms []withkey.WithKey[inversein
 		doc := &DocInfo{
 			ID: curSeeks[0].DocumentID,
 		}
-		if err := doc.Decode(doc.ID, docReader); err != nil {
+		if err := doc.Decode(doc.ID, readers.DocReader); err != nil {
 			return err
 		}
 

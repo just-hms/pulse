@@ -10,12 +10,17 @@ import (
 )
 
 type LexiconReaders struct {
-	Terms          *os.File
-	Posting, Freqs io.ReaderAt
+	Terms                     *os.File
+	TermsInfo, Posting, Freqs io.ReaderAt
 }
 
 func OpenLexicon(path string) (LexiconReaders, error) {
 	termsReader, err := os.Open(filepath.Join(path, "terms.bin"))
+	if err != nil {
+		return LexiconReaders{}, err
+	}
+
+	termsInfoReader, err := mmap.Open(filepath.Join(path, "terms-info.bin"))
 	if err != nil {
 		return LexiconReaders{}, err
 	}
@@ -31,9 +36,10 @@ func OpenLexicon(path string) (LexiconReaders, error) {
 	}
 
 	return LexiconReaders{
-		Terms:   termsReader,
-		Posting: postingReader,
-		Freqs:   freqReader,
+		Terms:     termsReader,
+		Posting:   postingReader,
+		Freqs:     freqReader,
+		TermsInfo: termsInfoReader,
 	}, nil
 
 }
@@ -44,7 +50,7 @@ func (l *LexiconReaders) Close() error {
 }
 
 type LexiconFiles struct {
-	Terms, Posting, Freqs *os.File
+	Terms, Posting, Freqs, TermsInfo *os.File
 }
 
 func CreateLexicon(path string) (LexiconFiles, error) {
@@ -53,6 +59,11 @@ func CreateLexicon(path string) (LexiconFiles, error) {
 	termsFile, err := os.OpenFile(filepath.Join(path, "terms.bin"), flag, 0644)
 	if err != nil {
 		return LexiconFiles{}, fmt.Errorf("failed to open terms file: %w", err)
+	}
+
+	termsInfoFile, err := os.OpenFile(filepath.Join(path, "terms-info.bin"), flag, 0644)
+	if err != nil {
+		return LexiconFiles{}, fmt.Errorf("failed to open terms-info file: %w", err)
 	}
 
 	postingFile, err := os.OpenFile(filepath.Join(path, "posting.bin"), flag, 0644)
@@ -69,9 +80,10 @@ func CreateLexicon(path string) (LexiconFiles, error) {
 	}
 
 	return LexiconFiles{
-		Terms:   termsFile,
-		Posting: postingFile,
-		Freqs:   freqsFile,
+		Terms:     termsFile,
+		Posting:   postingFile,
+		Freqs:     freqsFile,
+		TermsInfo: termsInfoFile,
 	}, nil
 }
 

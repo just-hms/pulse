@@ -12,6 +12,7 @@ import (
 
 	"github.com/just-hms/pulse/pkg/compression/deltavarint"
 	"github.com/just-hms/pulse/pkg/compression/unary"
+	"github.com/just-hms/pulse/pkg/countwriter"
 	"github.com/just-hms/pulse/pkg/structures/withkey"
 )
 
@@ -51,6 +52,7 @@ func (l Lexicon) Encode(loc LexiconFiles, compression bool) error {
 	terms := slices.Collect(l.Terms())
 
 	termEnc := gob.NewEncoder(loc.Terms)
+	termInfoWriter := countwriter.NewWriter(loc.TermsInfo)
 
 	freqEnc := bufio.NewWriter(loc.Freqs)
 	defer freqEnc.Flush()
@@ -89,7 +91,7 @@ func (l Lexicon) Encode(loc LexiconFiles, compression bool) error {
 		}
 
 		// encode term
-		if err := termEnc.Encode(t); err != nil {
+		if err := EncodeTerm(&t, termEnc, termInfoWriter); err != nil {
 			return err
 		}
 

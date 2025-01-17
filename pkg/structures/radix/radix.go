@@ -3,16 +3,22 @@ package radix
 import (
 	"encoding/gob"
 	"errors"
+	"fmt"
 	"io"
 	"iter"
+	"log"
 
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
 	"github.com/just-hms/pulse/pkg/structures/withkey"
 )
 
 func Decode[T any](r io.Reader, tree **iradix.Tree[T]) error {
+	// todo: remove
+	log.Println("checkpoint 1")
+	fmt.Scanln()
+
 	dec := gob.NewDecoder(r)
-	txn := (*tree).Txn()
+
 	for {
 		t := withkey.WithKey[T]{}
 		err := dec.Decode(&t)
@@ -22,10 +28,17 @@ func Decode[T any](r io.Reader, tree **iradix.Tree[T]) error {
 		if err != nil {
 			return err
 		}
-		txn.Insert([]byte(t.Key), t.Value)
+
+		log.Println(t.Key, t.Value)
+		fmt.Scanln()
+
+		*tree, _, _ = (*tree).Insert([]byte(t.Key), t.Value)
 	}
 
-	*tree = txn.Commit()
+	// todo: remove
+	log.Println("checkpoint 2 ")
+	fmt.Scanln()
+
 	return nil
 }
 
@@ -48,8 +61,8 @@ func Encode[T any](w io.Writer, tree *iradix.Tree[T]) error {
 			Key:   string(k),
 			Value: t,
 		}
-		err := enc.Encode(t)
-		if err != nil {
+
+		if err := enc.Encode(t); err != nil {
 			return err
 		}
 	}
