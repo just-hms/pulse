@@ -3,7 +3,6 @@ package radix
 import (
 	"encoding/gob"
 	"errors"
-	"fmt"
 	"io"
 	"iter"
 
@@ -12,8 +11,8 @@ import (
 )
 
 func Decode[T any](r io.Reader, tree **iradix.Tree[T]) error {
-	txn := (*tree).Txn()
 	dec := gob.NewDecoder(r)
+	txn := (*tree).Txn()
 	for {
 		t := withkey.WithKey[T]{}
 		err := dec.Decode(&t)
@@ -23,10 +22,7 @@ func Decode[T any](r io.Reader, tree **iradix.Tree[T]) error {
 		if err != nil {
 			return err
 		}
-		_, ok := txn.Insert([]byte(t.Key), t.Value)
-		if !ok {
-			return fmt.Errorf("problems inserting %s", t.Key)
-		}
+		txn.Insert([]byte(t.Key), t.Value)
 	}
 
 	*tree = txn.Commit()
