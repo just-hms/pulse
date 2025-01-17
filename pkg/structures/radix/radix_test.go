@@ -1,6 +1,7 @@
 package radix_test
 
 import (
+	"bytes"
 	"testing"
 
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
@@ -10,6 +11,45 @@ import (
 
 func Ref[T any](v T) *T {
 	return &v
+}
+
+func TestEncodeDecode(t *testing.T) {
+	t.Parallel()
+	req := require.New(t)
+
+	var buf bytes.Buffer
+
+	{
+		tree := iradix.New[uint]()
+		aTreeTxn := tree.Txn()
+		aTreeTxn.Insert([]byte("a"), 1)
+		aTreeTxn.Insert([]byte("b"), 2)
+		aTreeTxn.Insert([]byte("c"), 3)
+
+		tree = aTreeTxn.Commit()
+		err := radix.Encode(&buf, tree)
+		req.NoError(err)
+	}
+
+	got := map[string]uint{}
+	{
+		decoded := iradix.New[uint]()
+		err := radix.Decode(&buf, &decoded)
+		req.NoError(err)
+
+		for k, v := range radix.Values(decoded) {
+			got[string(k)] = v
+		}
+	}
+
+	exp := map[string]uint{
+		"a": 1,
+		"b": 2,
+		"c": 3,
+	}
+
+	req.Equal(exp, got)
+
 }
 
 func TestMerge(t *testing.T) {
