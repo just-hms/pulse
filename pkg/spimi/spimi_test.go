@@ -70,20 +70,17 @@ func TestSpimi(t *testing.T) {
 		"the": {
 			[][]uint32{{0, 1, 2}, {0, 2}},
 			[][]uint32{{3, 1, 2}, {2, 2}},
-			3,
-			5,
+			3, 5,
 		},
 		"purpose": {
 			[][]uint32{{2}, {}},
 			[][]uint32{{1}, {}},
-			1,
-			1,
+			1, 1,
 		},
 		"offender": {
 			[][]uint32{{}, {0, 2}},
 			[][]uint32{{}, {1, 1}},
-			1,
-			2,
+			1, 2,
 		},
 	}
 
@@ -123,8 +120,10 @@ func TestSpimi(t *testing.T) {
 
 			// check postings
 			{
+				// check the posting list length against the test's one
 				req.Equal(uint32(len(expInfo.Postings[i])*int(unsafe.Sizeof(uint32(0)))), lTerm.PostLength)
 
+				// retrieve the binary content of the posting list from the file
 				content, err := io.ReadAll(
 					io.NewSectionReader(readers.Posting, int64(lTerm.PostStart), int64(lTerm.PostLength)),
 				)
@@ -138,8 +137,10 @@ func TestSpimi(t *testing.T) {
 
 			// check frequencies
 			{
+				// check the frequencies length against the test's one
 				req.Equal(uint32(len(expInfo.Frequencies[i])*int(unsafe.Sizeof(uint32(0)))), lTerm.FreqLength)
 
+				// retrieve the binary content of the term frequencies from the file
 				content, err := io.ReadAll(
 					io.NewSectionReader(readers.Freqs, int64(lTerm.FreqStart), int64(lTerm.FreqLength)),
 				)
