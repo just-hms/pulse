@@ -42,7 +42,13 @@ func EncodeTerm[T any](t *withkey.WithKey[T], termW *gob.Encoder, cw *countwrite
 func UpdateTerm[T any](t T, offset uint32, w io.WriterAt) error {
 	// Determine the size of the type T
 	size := int(unsafe.Sizeof(t))
-	data := make([]byte, size)
+
+	var buf bytes.Buffer
+
+	if err := binary.Write(&buf, binary.LittleEndian, t); err != nil {
+		return err
+	}
+	data := buf.Bytes()[:size]
 
 	if _, err := w.WriteAt(data, int64(offset)); err != nil {
 		return err

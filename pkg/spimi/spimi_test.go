@@ -6,10 +6,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"maps"
 	"os"
 	"path/filepath"
 	"testing"
+	"unsafe"
 
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
 	"github.com/just-hms/pulse/pkg/spimi"
@@ -45,6 +47,7 @@ func TestSpimi(t *testing.T) {
 		err = spimiBuilder.Parse(r, 1, path)
 		req.NoError(err)
 	}
+
 	err := spimi.Merge(path)
 	req.NoError(err)
 
@@ -65,10 +68,22 @@ func TestSpimi(t *testing.T) {
 		DocumentFrequency uint32
 	}{
 		"the": {
-			[][]uint32{{0, 1, 2}, {3, 5}},
+			[][]uint32{{0, 1, 2}, {0, 2}},
 			[][]uint32{{3, 1, 2}, {2, 2}},
 			3,
 			5,
+		},
+		"purpose": {
+			[][]uint32{{2}, {}},
+			[][]uint32{{1}, {}},
+			1,
+			1,
+		},
+		"offender": {
+			[][]uint32{{}, {0, 2}},
+			[][]uint32{{}, {1, 1}},
+			1,
+			2,
 		},
 	}
 
@@ -87,12 +102,18 @@ func TestSpimi(t *testing.T) {
 		req.Equal(expInfo.MaxTermFrequency, gTerm.MaxTermFrequency)
 
 		for i := range 2 {
+			log.Printf(`"testing": {"token":%q, "partition":"%d"}`, token, i)
+
 			readers, err := spimi.OpenSpimiFiles(filepath.Join(path, fmt.Sprint(i)))
 			req.NoError(err)
 
 			lLexicon := iradix.New[uint32]()
 			err = radix.Decode(readers.Terms, &lLexicon)
 			req.NoError(err)
+
+			if len(expInfo.Postings[i]) == 0 {
+				continue
+			}
 
 			lOffset, ok := lLexicon.Get([]byte(token))
 			req.True(ok)
@@ -102,6 +123,8 @@ func TestSpimi(t *testing.T) {
 
 			// check postings
 			{
+				req.Equal(uint32(len(expInfo.Postings[i])*int(unsafe.Sizeof(uint32(0)))), lTerm.PostLength)
+
 				content, err := io.ReadAll(
 					io.NewSectionReader(readers.Posting, int64(lTerm.PostStart), int64(lTerm.PostLength)),
 				)
@@ -115,6 +138,8 @@ func TestSpimi(t *testing.T) {
 
 			// check frequencies
 			{
+				req.Equal(uint32(len(expInfo.Frequencies[i])*int(unsafe.Sizeof(uint32(0)))), lTerm.FreqLength)
+
 				content, err := io.ReadAll(
 					io.NewSectionReader(readers.Freqs, int64(lTerm.FreqStart), int64(lTerm.FreqLength)),
 				)

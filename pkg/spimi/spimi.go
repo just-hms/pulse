@@ -116,13 +116,18 @@ func Merge(path string) error {
 	}
 	defer gTermInfoF.Close()
 
-	termsEnc := gob.NewEncoder(gTermInfoF)
+	gTermF, err := os.Create(filepath.Join(path, "terms.bin"))
+	if err != nil {
+		return err
+	}
+	defer gTermF.Close()
+
+	termsEnc := gob.NewEncoder(gTermF)
 
 	gLexicon := iradix.New[uint32]().Txn()
 	cw := countwriter.NewWriter(gTermInfoF)
 
 	for _, partition := range partitions {
-
 		folder := filepath.Join(path, partition.Name())
 
 		termF, err := os.Open(filepath.Join(folder, "terms.bin"))
@@ -182,11 +187,5 @@ func Merge(path string) error {
 
 	}
 
-	gTermF, err := os.Create(filepath.Join(path, "terms.bin"))
-	if err != nil {
-		return err
-	}
-	defer gTermF.Close()
-
-	return radix.Encode(gTermF, gLexicon.Commit())
+	return nil
 }
