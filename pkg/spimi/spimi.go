@@ -12,7 +12,6 @@ import (
 	"github.com/just-hms/pulse/pkg/countwriter"
 	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
-	"github.com/just-hms/pulse/pkg/spimi/stats"
 	"github.com/just-hms/pulse/pkg/structures/radix"
 	"github.com/just-hms/pulse/pkg/structures/withkey"
 	"golang.org/x/exp/mmap"
@@ -25,17 +24,13 @@ const (
 	GB = MB * 1024
 )
 
-const (
-	sleep                  = time.Second
-	memoryThreshold uint64 = 3 * GB
-)
+const DefaulMemoryThreshold = 3 * GB / MB
 
-func Parse(r ChunkReader, numWorkers int, path string, s stats.IndexingSettings) error {
+func (b *builder) Parse(r ChunkReader, numWorkers int, path string) error {
 
 	var (
 		workers  errgroup.Group
 		dumper   errgroup.Group
-		b        = newBuilder(s)
 		memStats runtime.MemStats
 	)
 
@@ -44,12 +39,12 @@ func Parse(r ChunkReader, numWorkers int, path string, s stats.IndexingSettings)
 	dumper.Go(func() error {
 		hit := 0
 		for {
-			time.Sleep(sleep)
+			time.Sleep(time.Second)
 
 			runtime.ReadMemStats(&memStats)
 			eof := r.EOF()
 
-			if memStats.Alloc > memoryThreshold {
+			if memStats.Alloc > uint64(b.IndexingSettings.MemoryThresholdMB*MB) {
 				hit++
 			} else {
 				hit = 0
@@ -68,7 +63,7 @@ func Parse(r ChunkReader, numWorkers int, path string, s stats.IndexingSettings)
 				}
 			}
 
-			err := b.Encode(path)
+			err := b.encode(path)
 			if err != nil {
 				return err
 			}
@@ -94,7 +89,7 @@ func Parse(r ChunkReader, numWorkers int, path string, s stats.IndexingSettings)
 					}
 				}
 
-				b.Add(freqs, inverseindex.NewDocument(doc.No, len(doc.Content)))
+				b.add(freqs, inverseindex.NewDocument(doc.No, len(doc.Content)))
 			}
 			return nil
 		})

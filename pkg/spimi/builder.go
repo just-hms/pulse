@@ -15,33 +15,33 @@ import (
 )
 
 type builder struct {
-	Lexicon    inverseindex.Lexicon
-	Collection inverseindex.Collection
+	lexicon    inverseindex.Lexicon
+	collection inverseindex.Collection
 	mu         sync.Mutex
 
 	dumpCounter uint32
 	stats.IndexingSettings
 }
 
-func newBuilder(s stats.IndexingSettings) *builder {
+func NewBuilder(s stats.IndexingSettings) *builder {
 	return &builder{
-		Lexicon:          inverseindex.Lexicon{},
-		Collection:       inverseindex.Collection{},
+		lexicon:          inverseindex.Lexicon{},
+		collection:       inverseindex.Collection{},
 		mu:               sync.Mutex{},
 		dumpCounter:      0,
 		IndexingSettings: s,
 	}
 }
 
-func (b *builder) Add(freqs map[string]uint32, doc inverseindex.Document) {
+func (b *builder) add(freqs map[string]uint32, doc inverseindex.Document) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.Collection.Add(doc)
-	b.Lexicon.Add(freqs, uint32(b.Collection.Len()-1))
+	b.collection.Add(doc)
+	b.lexicon.Add(freqs, uint32(b.collection.Len()-1))
 }
 
-func (b *builder) Encode(path string) error {
+func (b *builder) encode(path string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	defer func() { b.dumpCounter++ }()
@@ -63,7 +63,7 @@ func (b *builder) Encode(path string) error {
 			return err
 		}
 		defer f.Close()
-		return b.Collection.Encode(f)
+		return b.collection.Encode(f)
 
 	})
 
@@ -73,7 +73,7 @@ func (b *builder) Encode(path string) error {
 			return err
 		}
 		defer f.Close()
-		return b.Lexicon.Encode(f, b.IndexingSettings.Compression)
+		return b.lexicon.Encode(f, b.IndexingSettings.Compression)
 	})
 
 	if err := wg.Wait(); err != nil {
@@ -89,7 +89,7 @@ func (b *builder) Encode(path string) error {
 
 		s, _ := stats.Load(f)
 		s.IndexingSettings = b.IndexingSettings
-		s.Update(uint32(b.Collection.Len()), b.Collection.AvgDocumentSize)
+		s.Update(uint32(b.collection.Len()), b.collection.AvgDocumentSize)
 		if err := s.Dump(f); err != nil {
 			return err
 		}
@@ -97,8 +97,8 @@ func (b *builder) Encode(path string) error {
 		defer f.Close()
 	}
 
-	b.Lexicon.Clear()
-	b.Collection.Clear()
+	b.lexicon.Clear()
+	b.collection.Clear()
 	return nil
 }
 

@@ -71,8 +71,8 @@ func Load(path string) (*engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	globalLexicon := iradix.New[uint32]()
-	if err := radix.Decode(gTermsF, &globalLexicon); err != nil {
+	gLexicon := iradix.New[uint32]()
+	if err := radix.Decode(gTermsF, &gLexicon); err != nil {
 		return nil, err
 	}
 
@@ -117,7 +117,7 @@ func Load(path string) (*engine, error) {
 
 	return &engine{
 		path:            path,
-		gLexicon:        globalLexicon,
+		gLexicon:        gLexicon,
 		readers:         readers,
 		stats:           stats,
 		lLexicons:       lLexicons,
@@ -128,7 +128,7 @@ func Load(path string) (*engine, error) {
 func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 	qTokens := preprocess.GetTokens(query, e.stats.IndexingSettings)
 
-	qGlobalTerms := make([]withkey.WithKey[inverseindex.GlobalTerm], 0)
+	qgTerms := make([]withkey.WithKey[inverseindex.GlobalTerm], 0)
 	for _, qToken := range qTokens {
 		if gOffset, ok := e.gLexicon.Get([]byte(qToken)); ok {
 			gTerm, err := inverseindex.DecodeTerm[inverseindex.GlobalTerm](gOffset, e.gTermInfoReader)
@@ -136,7 +136,7 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 				return nil, err
 			}
 
-			qGlobalTerms = append(qGlobalTerms, withkey.WithKey[inverseindex.GlobalTerm]{
+			qgTerms = append(qgTerms, withkey.WithKey[inverseindex.GlobalTerm]{
 				Key:   qToken,
 				Value: *gTerm,
 			})
@@ -149,7 +149,7 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 		// 	launch the query for each partition
 		wg.Go(func() error {
 			results[i].Cap = s.K
-			return e.searchPartition(i, qGlobalTerms, e.stats, s, &results[i])
+			return e.searchPartition(i, qgTerms, e.stats, s, &results[i])
 		})
 	}
 

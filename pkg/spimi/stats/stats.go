@@ -7,7 +7,9 @@ import (
 
 type IndexingSettings struct {
 	Stemming, StopWordsRemoval, Compression bool
+	MemoryThresholdMB                       int
 }
+
 type Stats struct {
 	IndexingSettings
 	N   uint32  // collection size

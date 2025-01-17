@@ -12,11 +12,12 @@ import (
 )
 
 var (
-	workersFlag       uint
-	chunkSizeFlag     uint
-	noStopWordsFlag   bool
-	noStemmingFlag    bool
-	noCompressionFlag bool
+	workersFlag         uint
+	chunkSizeFlag       uint
+	memoryThresholdFlag uint
+	noStopWordsFlag     bool
+	noStemmingFlag      bool
+	noCompressionFlag   bool
 )
 
 var spimiCmd = &cobra.Command{
@@ -40,12 +41,15 @@ var spimiCmd = &cobra.Command{
 
 		msMarcoReader := readers.NewMsMarco(bufio.NewReader(f), int(chunkSizeFlag))
 		settings := stats.IndexingSettings{
-			Stemming:         !noStemmingFlag,
-			StopWordsRemoval: !noStopWordsFlag,
-			Compression:      !noCompressionFlag,
+			Stemming:          !noStemmingFlag,
+			StopWordsRemoval:  !noStopWordsFlag,
+			Compression:       !noCompressionFlag,
+			MemoryThresholdMB: int(memoryThresholdFlag),
 		}
 
-		if err := spimi.Parse(msMarcoReader, int(workersFlag), config.DATA_FOLDER, settings); err != nil {
+		spimiBuilder := spimi.NewBuilder(settings)
+
+		if err := spimiBuilder.Parse(msMarcoReader, int(workersFlag), config.DATA_FOLDER); err != nil {
 			return err
 		}
 
@@ -61,6 +65,7 @@ func init() {
 
 	spimiCmd.Flags().UintVarP(&workersFlag, "workers", "w", 16, "number of workers indexing the dataset")
 	spimiCmd.Flags().UintVarP(&chunkSizeFlag, "chunk", "c", 50_000, "reader chunk size")
+	spimiCmd.Flags().UintVarP(&memoryThresholdFlag, "max-memory", "m", spimi.DefaulMemoryThreshold, "max memory used during indexing [MB]")
 
 	spimiCmd.Flags().BoolVar(&noCompressionFlag, "no-compression", false, "compress the posting list and term frequencies")
 	spimiCmd.Flags().BoolVar(&noStopWordsFlag, "no-stopwords", false, "remove stopwords removal")
