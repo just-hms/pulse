@@ -157,7 +157,7 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 		return nil, err
 	}
 
-	result := &heap.Heap[*DocInfo]{Cap: s.K}
+	result := heap.Heap[*DocInfo]{Cap: s.K}
 	for _, res := range results {
 		result.Push(res.Values()...)
 	}
@@ -167,13 +167,13 @@ func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
 }
 
 func (e *engine) searchPartition(i int, qgTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result *heap.Heap[*DocInfo]) error {
-	readers := e.readers[i]
+	reader := e.readers[i]
 
 	qlTerms := make([]withkey.WithKey[inverseindex.LocalTerm], 0)
 	for _, qgTerm := range qgTerms {
 		lOffest, ok := e.lLexicons[i].Get([]byte(qgTerm.Key))
 		if ok {
-			lTerm, err := inverseindex.DecodeTerm[inverseindex.LocalTerm](lOffest, readers.TermsInfo)
+			lTerm, err := inverseindex.DecodeTerm[inverseindex.LocalTerm](lOffest, reader.TermsInfo)
 			if err != nil {
 				return err
 			}
@@ -185,7 +185,7 @@ func (e *engine) searchPartition(i int, qgTerms []withkey.WithKey[inverseindex.G
 					FreqStart:  lTerm.FreqStart,
 					FreqLength: lTerm.FreqLength,
 					PostStart:  lTerm.PostStart,
-					PostLength: lTerm.FreqLength,
+					PostLength: lTerm.PostLength,
 				},
 			})
 			continue
@@ -199,7 +199,7 @@ func (e *engine) searchPartition(i int, qgTerms []withkey.WithKey[inverseindex.G
 
 	seekers := make([]*seeker.Seeker, 0, len(qlTerms))
 	for _, qlTerm := range qlTerms {
-		s := seeker.NewSeeker(readers.Posting, readers.Freqs, qlTerm, stats.Compression)
+		s := seeker.NewSeeker(reader.Posting, reader.Freqs, qlTerm, stats.Compression)
 		s.Next()
 		seekers = append(seekers, s)
 	}
@@ -225,7 +225,7 @@ func (e *engine) searchPartition(i int, qgTerms []withkey.WithKey[inverseindex.G
 		doc := &DocInfo{
 			ID: curSeeks[0].DocumentID,
 		}
-		if err := doc.Decode(doc.ID, readers.DocReader); err != nil {
+		if err := doc.Decode(doc.ID, reader.DocReader); err != nil {
 			return err
 		}
 

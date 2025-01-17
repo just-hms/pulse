@@ -30,6 +30,7 @@ type query struct {
 	value string
 }
 
+// todo: maybe return an iterator also here
 func FileQueries(path string) ([]query, error) {
 	// Open the file
 	file, err := os.Open(path)
@@ -107,7 +108,6 @@ var searchCmd = &cobra.Command{
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-
 		// Parse the metric
 		metric, err := engine.ParseMetric(metricFlag)
 		if err != nil {
@@ -149,11 +149,9 @@ var searchCmd = &cobra.Command{
 
 			for rank, doc := range res {
 				// result file format:
-				// <query_id> 0 <doc_id> <rank> <score> <run_id>
-				fmt.Printf("%d\tQ0\t%s\t%d\t%.4f\tRANDOMID\n", query.id, doc.No(), rank, doc.Score)
+				// <query_id> 0 <doc_id> <rank> <score> <run_id> <elapsed_time>
+				fmt.Printf("%d\tQ0\t%s\t%d\t%.4f\tRANDOMID\t%v\n", query.id, doc.No(), rank, doc.Score, time.Since(start))
 			}
-
-			log.Println(time.Since(start))
 		}
 
 		return nil
