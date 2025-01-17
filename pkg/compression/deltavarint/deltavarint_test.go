@@ -44,11 +44,13 @@ func TestWriter(t *testing.T) {
 
 			w := deltavarint.NewWriter(f)
 
+			sum := 0
 			// Write the test values
 			for _, value := range tt.values {
 				binary.LittleEndian.PutUint64(buf, value)
-				_, err := w.Write(buf)
+				n, err := w.Write(buf)
 				req.NoError(err)
+				sum += n
 			}
 
 			got := f.Bytes()
@@ -56,6 +58,7 @@ func TestWriter(t *testing.T) {
 				got = []byte{}
 			}
 			req.Equal(tt.exp, got)
+			req.Equal(len(tt.exp), sum)
 		})
 	}
 }

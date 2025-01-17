@@ -74,7 +74,7 @@ func InteractiveQueries() iter.Seq2[int, query] {
 			i++
 		}()
 		for {
-			log.Print("> ")
+			fmt.Fprintf(os.Stderr, "> ")
 			line, err := reader.ReadString('\n')
 			if err != nil {
 				return
@@ -124,17 +124,14 @@ var searchCmd = &cobra.Command{
 		switch {
 		case interactiveFlag:
 			queries = InteractiveQueries()
-			break
 		case fileFlag != "":
 			fqueries, err := FileQueries(fileFlag)
 			if err != nil {
 				return err
 			}
 			queries = slices.All(fqueries)
-			break
 		case singleQueryFlag != "":
 			queries = slices.All([]query{{value: singleQueryFlag}})
-			break
 		}
 
 		// Process each search argument
