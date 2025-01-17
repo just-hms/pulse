@@ -27,8 +27,3 @@ tar xOf dataset.tar.gz | pulse spimi
 pulse search "in the town where a I was born lived a man" -m TFIDF -p
 pprof -http=localhost:8080 pulse.prof
 ```
-
-## todo
-
-- [] add compression (maybe not)
-- [] implement `nextGEQ`

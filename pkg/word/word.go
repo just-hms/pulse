@@ -19,8 +19,8 @@ var (
 
 func Clean(s string) string {
 	s, _, _ = transform.String(unicodeNormalizer(), s)
-	s = htmlTags.ReplaceAllString(s, "")
-	s = punctuationRemover.ReplaceAllString(s, "")
+	s = htmlTags.ReplaceAllString(s, " ")
+	s = punctuationRemover.ReplaceAllString(s, " ")
 	return s
 }
 

@@ -3,22 +3,17 @@ package radix
 import (
 	"encoding/gob"
 	"errors"
-	"fmt"
 	"io"
 	"iter"
-	"log"
 
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
 	"github.com/just-hms/pulse/pkg/structures/withkey"
 )
 
 func Decode[T any](r io.Reader, tree **iradix.Tree[T]) error {
-	// todo: remove
-	log.Println("checkpoint 1")
-	fmt.Scanln()
-
 	dec := gob.NewDecoder(r)
 
+	txn := (*tree).Txn()
 	for {
 		t := withkey.WithKey[T]{}
 		err := dec.Decode(&t)
@@ -29,24 +24,18 @@ func Decode[T any](r io.Reader, tree **iradix.Tree[T]) error {
 			return err
 		}
 
-		log.Println(t.Key, t.Value)
-		fmt.Scanln()
-
-		*tree, _, _ = (*tree).Insert([]byte(t.Key), t.Value)
+		txn.Insert([]byte(t.Key), t.Value)
 	}
 
-	// todo: remove
-	log.Println("checkpoint 2 ")
-	fmt.Scanln()
-
+	(*tree) = txn.Commit()
 	return nil
 }
 
 func Values[T any](tree *iradix.Tree[T]) iter.Seq2[[]byte, T] {
 	it := tree.Root().Iterator()
 	return func(yield func([]byte, T) bool) {
-		for key, t, ok := it.Next(); ok; key, t, ok = it.Next() {
-			if !yield(key, t) {
+		for key, val, ok := it.Next(); ok; key, val, ok = it.Next() {
+			if !yield(key, val) {
 				return
 			}
 		}
@@ -56,10 +45,10 @@ func Values[T any](tree *iradix.Tree[T]) iter.Seq2[[]byte, T] {
 func Encode[T any](w io.Writer, tree *iradix.Tree[T]) error {
 	enc := gob.NewEncoder(w)
 
-	for k, t := range Values(tree) {
+	for key, val := range Values(tree) {
 		t := withkey.WithKey[T]{
-			Key:   string(k),
-			Value: t,
+			Key:   string(key),
+			Value: val,
 		}
 
 		if err := enc.Encode(t); err != nil {
