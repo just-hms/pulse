@@ -1,4 +1,4 @@
-package readers_test
+package reader_test
 
 import (
 	"bufio"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/just-hms/pulse/pkg/spimi"
-	"github.com/just-hms/pulse/pkg/spimi/readers"
+	"github.com/just-hms/pulse/pkg/spimi/reader"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,7 +17,7 @@ func TestMsMarco(t *testing.T) {
 	f, err := os.Open("testdata/test.tsv")
 	req.NoError(err)
 
-	r := readers.NewMsMarco(bufio.NewReader(f), 5)
+	r := reader.NewMsMarco(bufio.NewReader(f), 5)
 
 	got := [][]spimi.Document{}
 	for v, err := range r.Read() {

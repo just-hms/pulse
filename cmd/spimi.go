@@ -6,7 +6,7 @@ import (
 
 	"github.com/just-hms/pulse/config"
 	"github.com/just-hms/pulse/pkg/spimi"
-	"github.com/just-hms/pulse/pkg/spimi/readers"
+	"github.com/just-hms/pulse/pkg/spimi/reader"
 	"github.com/just-hms/pulse/pkg/spimi/stats"
 	"github.com/spf13/cobra"
 )
@@ -21,10 +21,14 @@ var (
 )
 
 var spimiCmd = &cobra.Command{
-	Use:     "spimi",
-	Short:   "generate the indexes",
-	Example: "cat dataset | pulse spimi\npulse spimi ./path/to/dataset\ntar xOf dataset.tar.gz | pulse spimi",
-	Args:    cobra.RangeArgs(0, 1),
+	Use:   "spimi",
+	Short: "generate the indexes",
+
+	Example: `  cat dataset | pulse spimi
+  pulse spimi ./path/to/dataset
+  tar xOf dataset.tar.gz | pulse spimi`,
+
+	Args: cobra.RangeArgs(0, 1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		f := os.Stdin
 		if len(args) == 1 {
@@ -39,7 +43,7 @@ var spimiCmd = &cobra.Command{
 			return err
 		}
 
-		msMarcoReader := readers.NewMsMarco(bufio.NewReader(f), int(chunkSizeFlag))
+		msMarcoReader := reader.NewMsMarco(bufio.NewReader(f), int(chunkSizeFlag))
 		settings := stats.IndexingSettings{
 			Stemming:          !noStemmingFlag,
 			StopWordsRemoval:  !noStopWordsFlag,

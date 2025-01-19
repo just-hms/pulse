@@ -16,7 +16,7 @@ import (
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
 	"github.com/just-hms/pulse/pkg/spimi"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
-	"github.com/just-hms/pulse/pkg/spimi/readers"
+	"github.com/just-hms/pulse/pkg/spimi/reader"
 	"github.com/just-hms/pulse/pkg/spimi/stats"
 	"github.com/just-hms/pulse/pkg/structures/radix"
 	"github.com/stretchr/testify/require"
@@ -34,7 +34,7 @@ func TestSpimi(t *testing.T) {
 	}
 
 	spimiBuilder := spimi.NewBuilder(s)
-	path := "/tmp/pulse/dump"
+	path := t.TempDir()
 
 	for i := range 2 {
 		dataset := fmt.Sprintf("testdata/little%d.tsv", i)
@@ -42,7 +42,7 @@ func TestSpimi(t *testing.T) {
 		f, err := os.Open(dataset)
 		req.NoError(err)
 
-		r := readers.NewMsMarco(bufio.NewReader(f), 10)
+		r := reader.NewMsMarco(bufio.NewReader(f), 10)
 
 		err = spimiBuilder.Parse(r, 1, path)
 		req.NoError(err)

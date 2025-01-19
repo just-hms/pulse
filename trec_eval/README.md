@@ -1,6 +1,6 @@
 # trec_eval
 
-resorces:
+resources:
 
 - https://microsoft.github.io/msmarco/TREC-Deep-Learning-2020
 - https://github.com/usnistgov/trec_eval
@@ -26,6 +26,6 @@ Example: the `TREC DL 2019` queries and `TREC DL 2019 qrels`, or the `TREC DL 20
 ```sh
 tar xOf collection.tar.gz | pulse spimi
 # install pulse following the main README.md instructions
-pulse search -f data/msmarco-test2020-queries.tsv -k 1000 > data/results.tsv
-trec_eval -m all_trec data/2020qrels-pass.tsv data/results.tsv
+pulse search -f data/queries.tsv -k 1000 > data/results.tsv
+trec_eval -m all_trec data/qrels.tsv data/results.tsv
 ```

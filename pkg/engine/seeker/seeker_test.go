@@ -31,13 +31,14 @@ func TestSeeker(t *testing.T) {
 		err = lex.Encode(f, false)
 		req.NoError(err)
 	}
-	{
-		f, err := inverseindex.OpenLexicon(dir)
-		req.NoError(err)
-		defer f.Close()
 
-		localLexicon := iradix.New[inverseindex.LocalTerm]()
-		err = radix.Decode(f.Terms, &localLexicon)
+	{
+		r, err := inverseindex.OpenLexicon(dir)
+		req.NoError(err)
+		defer r.Close()
+
+		lLexicon := iradix.New[uint32]()
+		err = radix.Decode(r.Terms, &lLexicon)
 		req.NoError(err)
 
 		testcases := []struct {
@@ -62,19 +63,22 @@ func TestSeeker(t *testing.T) {
 		}
 
 		for _, tt := range testcases {
-			aTerm, ok := localLexicon.Get([]byte(tt.key))
+			offset, ok := lLexicon.Get([]byte(tt.key))
 			req.True(ok)
 
+			term, err := inverseindex.DecodeTerm[inverseindex.LocalTerm](offset, r.TermsInfo)
+			req.NoError(err)
+
 			s := seeker.NewSeeker(
-				f.Posting, f.Freqs,
-				withkey.WithKey[inverseindex.LocalTerm]{Key: tt.key, Value: aTerm},
+				r.Posting, r.Freqs,
+				withkey.WithKey[inverseindex.LocalTerm]{Key: tt.key, Value: *term},
 				false,
 			)
 
 			got := map[uint32]uint32{}
 
 			for !seeker.EOD(s) {
-				err = s.Next()
+				err := s.Next()
 				req.NoError(err)
 				got[s.DocumentID] = s.TermFrequency
 			}

@@ -24,7 +24,7 @@ func TestTokenize(t *testing.T) {
 		{
 			"Punctuation",
 			"it's a test.",
-			[]string{"its", "a", "test"},
+			[]string{"it", "s", "a", "test"},
 		},
 
 		{

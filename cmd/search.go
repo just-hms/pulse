@@ -95,6 +95,10 @@ func InteractiveQueries() iter.Seq2[int, query] {
 var searchCmd = &cobra.Command{
 	Use:   "search",
 	Short: "do one or more queries",
+
+	Example: `  pulse search -q "who is the president right now" -m TFIDF
+  pulse search -i`,
+
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		if fileFlag != "" {
 			f, err := os.Stat(fileFlag)
@@ -147,11 +151,16 @@ var searchCmd = &cobra.Command{
 				return err
 			}
 
+			end := time.Since(start)
+
 			for rank, doc := range res {
 				// result file format:
-				// <query_id> 0 <doc_id> <rank> <score> <run_id> <elapsed_time>
-				fmt.Printf("%d\tQ0\t%s\t%d\t%.4f\tRANDOMID\t%v\n", query.id, doc.No(), rank, doc.Score, time.Since(start))
+				// <query_id> 0 <doc_id> <rank> <score> <run_id>
+				fmt.Printf("%d\tQ0\t%s\t%d\t%.4f\tRANDOMID\n", query.id, doc.No(), rank, doc.Score)
 			}
+
+			// # <query_id> <elapsed_time> <elapsed_time_microseconds>
+			fmt.Printf("#\t%d\t%v\t%d\n", query.id, end, end.Microseconds())
 		}
 
 		return nil
