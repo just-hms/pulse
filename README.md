@@ -1,6 +1,6 @@
 # pulse
 
-A blazingly fast search engine written in golang
+`Multimedia Information Retrieval and Computer Vision` search engine project.
 
 ## Install
 
@@ -65,7 +65,7 @@ Global Flags:
 
 After the indexing phase use `pulse search` to query the dataset
 
-**there are three possible ways the engine can be queried:**
+**query**
 
 - interactive: using `pulse search -i` the program waits for the query to be input, then it returns the top `k` results and then waits for the next query
 - one-shot: using `pulse search -q` the program executes only the query passed as flag and returns the top `k` results
@@ -106,7 +106,7 @@ Global Flags:
 
 ## `trec_eval`
 
-All information about https://github.com/usnistgov/trec_eval is inside this [README.md](trec_eval/[README.md])
+All information about `trec_eval` are inside this [README.md](trec_eval/README.md)
 
 ## Documentation
 
