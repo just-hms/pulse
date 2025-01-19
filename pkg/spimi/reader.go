@@ -2,12 +2,12 @@ package spimi
 
 import "iter"
 
-type ChunkReader interface {
-	Read() iter.Seq2[[]Document, error]
-	EOF() bool
-}
+type Chunk = []Document
 
-type Document struct {
-	No      string
-	Content string
+// ChunkReader interface used by spimi to read a dataset
+//
+// implement this interface to read a different dataset
+type ChunkReader interface {
+	Read() iter.Seq2[Chunk, error]
+	EOF() bool
 }

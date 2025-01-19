@@ -3,10 +3,9 @@ package deltavarint
 import (
 	"encoding/binary"
 	"io"
-
-	"github.com/just-hms/pulse/pkg/compression/bytex"
 )
 
+// given and io.Reader reads out uint number using variable bytes encoding of the delta between a list of numbers
 type Reader struct {
 	io.ByteReader
 	last uint64
@@ -16,7 +15,7 @@ type Reader struct {
 
 func NewReader(r io.Reader) *Reader {
 	return &Reader{
-		ByteReader: bytex.NewReader(r),
+		ByteReader: newByteReader(r),
 		last:       0,
 		padded:     [8]byte{},
 	}

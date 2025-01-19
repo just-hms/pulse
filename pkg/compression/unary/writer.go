@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-// Writer encodes data into unary format and writes as bits
+// Writer given a io.Writer and a minimum writes out a unary representation of a given uint number
 type Writer struct {
 	io.Writer
 	minimum uint

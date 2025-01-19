@@ -1,19 +1,14 @@
-package stats
+package spimi
 
 import (
 	"encoding/gob"
 	"io"
 )
 
-type IndexingSettings struct {
-	Stemming, StopWordsRemoval, Compression bool
-	MemoryThresholdMB                       int
-}
-
 type Stats struct {
-	IndexingSettings
-	N   uint32  // collection size
-	ADL float64 // average document length
+	IndexingSettings         // settings used form indexing
+	N                uint32  // collection size
+	ADL              float64 // average document length
 }
 
 func (s *Stats) Dump(w io.Writer) error {
@@ -21,13 +16,13 @@ func (s *Stats) Dump(w io.Writer) error {
 	return enc.Encode(s)
 }
 
-func (s *Stats) Update(collectionSize uint32, averageDocumentSize float64) {
+func (s *Stats) UpdateStats(collectionSize uint32, averageDocumentSize float64) {
 	s.ADL = (s.ADL*float64(s.N) + averageDocumentSize*float64(collectionSize)) /
 		float64(s.N+collectionSize)
 	s.N += collectionSize
 }
 
-func Load(r io.Reader) (*Stats, error) {
+func LoadSettings(r io.Reader) (*Stats, error) {
 	dec := gob.NewDecoder(r)
 	c := &Stats{}
 	err := dec.Decode(c)

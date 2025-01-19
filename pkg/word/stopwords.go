@@ -2,6 +2,7 @@ package word
 
 import "github.com/just-hms/pulse/pkg/structures/set"
 
+// stopWords is set of stop words
 var stopWords = set.Set[string]{
 	"a":          struct{}{},
 	"about":      struct{}{},

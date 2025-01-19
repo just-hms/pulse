@@ -10,6 +10,7 @@ import (
 	"github.com/just-hms/pulse/pkg/structures/withkey"
 )
 
+// Decode deocdes iradix.Tree from a io.Reader
 func Decode[T any](r io.Reader, tree **iradix.Tree[T]) error {
 	dec := gob.NewDecoder(r)
 
@@ -31,6 +32,7 @@ func Decode[T any](r io.Reader, tree **iradix.Tree[T]) error {
 	return nil
 }
 
+// Values returns an iterator over the iradix.Tree values
 func Values[T any](tree *iradix.Tree[T]) iter.Seq2[[]byte, T] {
 	it := tree.Root().Iterator()
 	return func(yield func([]byte, T) bool) {
@@ -42,6 +44,7 @@ func Values[T any](tree *iradix.Tree[T]) iter.Seq2[[]byte, T] {
 	}
 }
 
+// Encode encodes a iradix.Tree into a io.Writer
 func Encode[T any](w io.Writer, tree *iradix.Tree[T]) error {
 	enc := gob.NewEncoder(w)
 

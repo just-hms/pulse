@@ -2,67 +2,42 @@ package engine
 
 import (
 	"io"
-	"math"
 	"os"
 	"path/filepath"
-	"slices"
 
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
-	"github.com/just-hms/pulse/pkg/engine/seeker"
-	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi"
-	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
-	"github.com/just-hms/pulse/pkg/spimi/stats"
-	"github.com/just-hms/pulse/pkg/structures/heap"
 	"github.com/just-hms/pulse/pkg/structures/radix"
-	"github.com/just-hms/pulse/pkg/structures/slicex"
-	"github.com/just-hms/pulse/pkg/structures/withkey"
 	"golang.org/x/exp/mmap"
 	"golang.org/x/sync/errgroup"
 )
 
+type partition struct {
+	lLexicon *iradix.Tree[uint32]
+	reader   *spimi.SpimiReaders
+}
+
+// engine contains all the pre-loaded data structures and file descriptors needed to perform a query
 type engine struct {
-	path string
+	path       string
+	spimiStats *spimi.Stats
 
 	gLexicon        *iradix.Tree[uint32]
 	gTermInfoReader io.ReaderAt
 
-	readers   []*spimi.SpimiReaders
-	lLexicons []*iradix.Tree[uint32]
-
-	stats *stats.Stats
+	partitions []*partition
 }
 
-func score(doc *DocInfo, seekers []*seeker.Seeker, stats *stats.Stats, s *Settings) {
-	switch s.Metric {
-	case TFIDF:
-		score := 0.0
-		for _, s := range seekers {
-			TF := float64(s.TermFrequency)
-			IDF := math.Log(float64(stats.N) / float64(s.Term.Value.DocumentFrequency))
-			score += (1 + math.Log(TF)) * IDF
-		}
-		doc.Score = score
-	case BM25:
-		score := 0.0
-		for _, s := range seekers {
-			TF := float64(s.TermFrequency)
-			IDF := math.Log(float64(stats.N) / float64(s.Term.Value.DocumentFrequency))
-			score += TF / (BM25_k1*((1-BM25_b)+BM25_b*(float64(doc.Size)/stats.ADL)) + TF) * IDF
-		}
-		doc.Score = score
-	default:
-		panic("metric not implemented")
-	}
-}
-
+// Load return an engine given a path
 func Load(path string) (*engine, error) {
 	statsFile, err := os.Open(filepath.Join(path, "stats.bin"))
 	if err != nil {
 		return nil, err
 	}
 
-	stats, err := stats.Load(statsFile)
+	// spimi settings are loaded, not user provided
+	// if stemming is used by the used during indexing it must be used also during querying
+	stats, err := spimi.LoadSettings(statsFile)
 	if err != nil {
 		return nil, err
 	}
@@ -81,32 +56,36 @@ func Load(path string) (*engine, error) {
 		return nil, err
 	}
 
-	partitions, err := spimi.ReadPartitions(path)
+	partitionsF, err := spimi.ReadPartitions(path)
 	if err != nil {
 		return nil, err
 	}
 
-	readers := make([]*spimi.SpimiReaders, len(partitions))
-	lLexicons := make([]*iradix.Tree[uint32], len(partitions))
-
+	partitions := make([]*partition, len(partitionsF))
 	var wg errgroup.Group
 
-	for i, partition := range partitions {
-		// 	launch the query for each partition
+	for i, f := range partitionsF {
+
+		// 	load each partition local indexes
 		wg.Go(func() error {
-			partitionName := filepath.Join(path, partition.Name())
-			reader, err := spimi.OpenSpimiFiles(partitionName)
+
+			partitionName := filepath.Join(path, f.Name())
+
+			reader, err := spimi.OpenSpimiReaders(partitionName)
 			if err != nil {
 				return err
 			}
 
+			// load each localLexicon for each partition
 			lLexicon := iradix.New[uint32]()
 			if err := radix.Decode(reader.LexiconReaders.Terms, &lLexicon); err != nil {
 				return err
 			}
 
-			lLexicons[i] = lLexicon
-			readers[i] = reader
+			partitions[i] = &partition{
+				lLexicon: lLexicon,
+				reader:   reader,
+			}
 			return nil
 		})
 	}
@@ -118,125 +97,8 @@ func Load(path string) (*engine, error) {
 	return &engine{
 		path:            path,
 		gLexicon:        gLexicon,
-		readers:         readers,
-		stats:           stats,
-		lLexicons:       lLexicons,
+		partitions:      partitions,
+		spimiStats:      stats,
 		gTermInfoReader: gTermInfoReader,
 	}, nil
-}
-
-func (e *engine) Search(query string, s *Settings) ([]*DocInfo, error) {
-	qTokens := preprocess.GetTokens(query, e.stats.IndexingSettings)
-
-	qgTerms := make([]withkey.WithKey[inverseindex.GlobalTerm], 0)
-	for _, qToken := range qTokens {
-		if gOffset, ok := e.gLexicon.Get([]byte(qToken)); ok {
-			gTerm, err := inverseindex.DecodeTerm[inverseindex.GlobalTerm](gOffset, e.gTermInfoReader)
-			if err != nil {
-				return nil, err
-			}
-
-			qgTerms = append(qgTerms, withkey.WithKey[inverseindex.GlobalTerm]{
-				Key:   qToken,
-				Value: *gTerm,
-			})
-		}
-	}
-
-	results := make([]heap.Heap[*DocInfo], len(e.readers))
-	var wg errgroup.Group
-	for i := range e.readers {
-		// 	launch the query for each partition
-		wg.Go(func() error {
-			results[i].Cap = s.K
-			return e.searchPartition(i, qgTerms, e.stats, s, &results[i])
-		})
-	}
-
-	if err := wg.Wait(); err != nil {
-		return nil, err
-	}
-
-	result := heap.Heap[*DocInfo]{Cap: s.K}
-	for _, res := range results {
-		result.Push(res.Values()...)
-	}
-	vals := result.Values()
-	slices.Reverse(vals)
-	return vals, nil
-}
-
-func (e *engine) searchPartition(i int, qgTerms []withkey.WithKey[inverseindex.GlobalTerm], stats *stats.Stats, s *Settings, result *heap.Heap[*DocInfo]) error {
-	reader := e.readers[i]
-
-	qlTerms := make([]withkey.WithKey[inverseindex.LocalTerm], 0)
-	for _, qgTerm := range qgTerms {
-		lOffest, ok := e.lLexicons[i].Get([]byte(qgTerm.Key))
-		if ok {
-			lTerm, err := inverseindex.DecodeTerm[inverseindex.LocalTerm](lOffest, reader.TermsInfo)
-			if err != nil {
-				return err
-			}
-
-			qlTerms = append(qlTerms, withkey.WithKey[inverseindex.LocalTerm]{
-				Key: qgTerm.Key,
-				Value: inverseindex.LocalTerm{
-					GlobalTerm: qgTerm.Value,
-					FreqStart:  lTerm.FreqStart,
-					FreqLength: lTerm.FreqLength,
-					PostStart:  lTerm.PostStart,
-					PostLength: lTerm.PostLength,
-				},
-			})
-			continue
-		}
-
-		// if a term is not present in any document and the query is conjuctive return 0 results
-		if s.Conjunctive {
-			return nil
-		}
-	}
-
-	seekers := make([]*seeker.Seeker, 0, len(qlTerms))
-	for _, qlTerm := range qlTerms {
-		s := seeker.NewSeeker(reader.Posting, reader.Freqs, qlTerm, stats.Compression)
-		s.Next()
-		seekers = append(seekers, s)
-	}
-
-	for {
-		if len(seekers) == 0 {
-			break
-		}
-		curSeeks := slicex.MinsFunc(seekers, func(a, b *seeker.Seeker) int {
-			return int(a.DocumentID) - int(b.DocumentID)
-		})
-
-		// if the current document does not contain all the terms go to the next
-		if len(curSeeks) != len(qlTerms) && s.Conjunctive {
-			for _, s := range curSeeks {
-				s.Next()
-			}
-			// remove all finished seekers
-			seekers = slices.DeleteFunc(seekers, seeker.EOD)
-			continue
-		}
-
-		doc := &DocInfo{
-			ID: curSeeks[0].DocumentID,
-		}
-		if err := doc.Decode(doc.ID, reader.DocReader); err != nil {
-			return err
-		}
-
-		score(doc, curSeeks, stats, s)
-		result.Push(doc)
-
-		// seek to the next
-		for _, s := range curSeeks {
-			s.Next()
-		}
-		seekers = slices.DeleteFunc(seekers, seeker.EOD)
-	}
-	return nil
 }

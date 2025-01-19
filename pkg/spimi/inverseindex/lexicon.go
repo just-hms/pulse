@@ -16,6 +16,7 @@ import (
 	"github.com/just-hms/pulse/pkg/structures/withkey"
 )
 
+// Lexicon is the data structure responsible for containg the terms information during indexing
 type Lexicon map[string]*LexVal
 
 type LexVal struct {

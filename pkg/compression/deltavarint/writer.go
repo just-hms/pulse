@@ -5,6 +5,7 @@ import (
 	"io"
 )
 
+// given and io.Writer writes out the delta between a list of numbersusing variable bytes
 type Writer struct {
 	io.Writer
 	last   uint64

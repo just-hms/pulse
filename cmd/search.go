@@ -1,18 +1,16 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"iter"
-	"log"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/just-hms/pulse/config"
 	"github.com/just-hms/pulse/pkg/engine"
+	"github.com/just-hms/pulse/pkg/query"
 	"github.com/spf13/cobra"
 )
 
@@ -25,73 +23,7 @@ var (
 	fileFlag        string
 )
 
-type query struct {
-	id    uint32
-	value string
-}
-
-// todo: maybe return an iterator also here
-func FileQueries(path string) ([]query, error) {
-	// Open the file
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var queries []query
-
-	// Read the file line by line
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		// Split the line into parts
-		parts := strings.Split(line, "\t")
-		if len(parts) < 2 {
-			log.Printf("format error discarding line: %s\n", line)
-			continue
-		}
-
-		// Parse query_id and relevance_score
-		queryID, err := strconv.ParseUint(parts[0], 10, 32)
-		if err != nil {
-			panic(err)
-		}
-		queries = append(queries, query{id: uint32(queryID), value: parts[1]})
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-	return queries, nil
-}
-
-func InteractiveQueries() iter.Seq2[int, query] {
-	i := 0
-	reader := bufio.NewReader(os.Stdin)
-
-	return func(yield func(int, query) bool) {
-		defer func() {
-			i++
-		}()
-		for {
-			fmt.Fprintf(os.Stderr, "> ")
-			line, err := reader.ReadString('\n')
-			if err != nil {
-				return
-			}
-			line = strings.TrimSpace(line)
-			q := query{
-				value: line,
-				id:    uint32(i),
-			}
-			if !yield(i, q) {
-				return
-			}
-		}
-	}
-}
-
+// searchCmd is the subcommand responsible to execute one or more query
 var searchCmd = &cobra.Command{
 	Use:   "search",
 	Short: "do one or more queries",
@@ -112,37 +44,41 @@ var searchCmd = &cobra.Command{
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		// Parse the metric
 		metric, err := engine.ParseMetric(metricFlag)
 		if err != nil {
 			return err
 		}
 
+		// Load the indexing data
 		e, err := engine.Load(config.DATA_FOLDER)
 		if err != nil {
 			return err
 		}
 
-		var queries iter.Seq2[int, query]
+		// create a query iterator depending on the query mode flags
+		var queries iter.Seq2[int, query.Query]
 
 		switch {
 		case interactiveFlag:
-			queries = InteractiveQueries()
+			queries = query.InteractiveQueries()
 		case fileFlag != "":
-			fqueries, err := FileQueries(fileFlag)
+			fqueries, err := query.FileQueries(fileFlag)
 			if err != nil {
 				return err
 			}
 			queries = slices.All(fqueries)
 		case singleQueryFlag != "":
-			queries = slices.All([]query{{value: singleQueryFlag}})
+			queries = slices.All([]query.Query{{Value: singleQueryFlag}})
 		}
 
-		// Process each search argument
+		// process each query
 		for _, query := range queries {
+
+			// perform the search
 			start := time.Now()
-			// Perform the search
-			res, err := e.Search(query.value, &engine.Settings{
+			res, err := e.Search(query.Value, &engine.SearchSettings{
 				K:           int(kFlag),
 				Metric:      metric,
 				Conjunctive: conjuctiveFlag,
@@ -150,17 +86,19 @@ var searchCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-
 			end := time.Since(start)
 
+			// print each result
 			for rank, doc := range res {
-				// result file format:
+				// result format:
 				// <query_id> 0 <doc_id> <rank> <score> <run_id>
-				fmt.Printf("%d\tQ0\t%s\t%d\t%.4f\tRANDOMID\n", query.id, doc.No(), rank, doc.Score)
+				fmt.Printf("%d\tQ0\t%s\t%d\t%.4f\tRANDOMID\n", query.ID, doc.No(), rank, doc.Score)
 			}
 
+			// print the query execution time
+			// elapsed time format:
 			// # <query_id> <elapsed_time> <elapsed_time_microseconds>
-			fmt.Printf("#\t%d\t%v\t%d\n", query.id, end, end.Microseconds())
+			fmt.Printf("#\t%d\t%v\t%d\n", query.ID, end, end.Microseconds())
 		}
 
 		return nil
@@ -170,16 +108,21 @@ var searchCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(searchCmd)
 
-	searchCmd.Flags().UintVarP(&kFlag, "doc2ret", "k", 10, "number of documents to be returned")
+	// query input flags (they determine how the queries are read by the program)
+	{
+		searchCmd.Flags().BoolVarP(&interactiveFlag, "interactive", "i", false, "interactive search")
+		searchCmd.Flags().StringVarP(&fileFlag, "file", "f", "", "add a queries file")
+		searchCmd.Flags().StringVarP(&singleQueryFlag, "query", "q", "", "single search")
+	}
 
-	searchCmd.Flags().BoolVarP(&interactiveFlag, "interactive", "i", false, "interactive search")
-	searchCmd.Flags().BoolVarP(&conjuctiveFlag, "conjunctive", "c", false, "search in conjunctive mode")
-	searchCmd.Flags().StringVarP(&singleQueryFlag, "query", "q", "", "single search")
-	searchCmd.Flags().StringVarP(&fileFlag, "file", "f", "", "add a queries file")
-
-	searchCmd.Flags().StringVarP(&metricFlag, "metric", "m", "BM25",
-		fmt.Sprintf("score metric to be used [%s]", strings.Join(engine.AllowedMetrics, "|")),
-	)
+	// search flags
+	{
+		searchCmd.Flags().UintVarP(&kFlag, "doc2ret", "k", 10, "number of documents to be returned")
+		searchCmd.Flags().BoolVarP(&conjuctiveFlag, "conjunctive", "c", false, "search in conjunctive mode")
+		searchCmd.Flags().StringVarP(&metricFlag, "metric", "m", "BM25",
+			fmt.Sprintf("score metric to be used [%s]", strings.Join(engine.AllowedMetrics, "|")),
+		)
+	}
 
 	searchCmd.MarkFlagsMutuallyExclusive("file", "interactive", "query")
 	searchCmd.MarkFlagsOneRequired("file", "interactive", "query")

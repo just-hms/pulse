@@ -8,13 +8,15 @@ import (
 	"golang.org/x/exp/mmap"
 )
 
+// SpimiReaders are file descriptors used to read the indexing files
 type SpimiReaders struct {
 	inverseindex.LexiconReaders
 	DocReader       io.ReaderAt
 	TermsInfoReader io.ReaderAt
 }
 
-func OpenSpimiFiles(path string) (*SpimiReaders, error) {
+// OpenSpimiReaders open the SpimiReaders from the given folder path
+func OpenSpimiReaders(path string) (*SpimiReaders, error) {
 	lxReader, err := inverseindex.OpenLexicon(path)
 	if err != nil {
 		return nil, err

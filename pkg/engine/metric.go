@@ -26,6 +26,7 @@ var metrics = map[string]Metric{
 
 var AllowedMetrics = slices.Collect(maps.Keys(metrics))
 
+// ParseMetric returns a metric given a string
 func ParseMetric(s string) (Metric, error) {
 	s = strings.ToUpper(s)
 	v, ok := metrics[s]

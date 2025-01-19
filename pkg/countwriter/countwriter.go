@@ -4,6 +4,7 @@ import (
 	"io"
 )
 
+// Writer wraps io.Writer keeping count of all the written data until the last Write()
 type Writer struct {
 	io.Writer
 	Count int

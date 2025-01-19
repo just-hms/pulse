@@ -13,6 +13,17 @@ import (
 var (
 	profileFlag bool
 )
+
+// rootCmd is the base command which every https://github.com/spf13/cobra cli program has.
+// The subcommands are added to this one and are called by the end user writing:
+//
+//	the rootCmd.Use followed by the specificCmd.Use
+//
+// ex:
+//
+//	pulse search
+//
+// calls the subcommand search
 var rootCmd = &cobra.Command{
 	Use:   "pulse",
 	Short: "this is the pulse search engine",

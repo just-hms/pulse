@@ -14,6 +14,7 @@ var (
 	})
 )
 
+// unicodeNormalizer removes malformed unicode and control character beside '\n' and `\t`
 func unicodeNormalizer() transform.Transformer {
 	return transform.Chain(
 		norm.NFD,                           // Decompose Unicode

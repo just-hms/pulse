@@ -5,6 +5,7 @@ import (
 	"io"
 )
 
+// Reader given a io.Reader and a minimum reads out a uint number given its unary representation
 type Reader struct {
 	io.Reader
 	minimum uint
@@ -23,8 +24,7 @@ func NewReader(r io.Reader, m uint) *Reader {
 	}
 }
 
-// Read decodes unary data and writes the decoded integers to the output slice `p`.
-// It returns the number of integers written and any errors encountered.
+// Read decodes unary data and writes the decoded integers to the output slice `p`
 func (ubr *Reader) Read(p []byte) (int, error) {
 	value, err := ubr.readUnary()
 	if err != nil {
@@ -37,8 +37,7 @@ func (ubr *Reader) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// readUnary decodes a single unary-encoded value from the bitstream.
-// Terminates if two consecutive zeros (padding) are detected.
+// readUnary decodes a single unary-encoded value from the bitstream
 func (ubr *Reader) readUnary() (uint64, error) {
 	var count uint64
 

@@ -9,11 +9,13 @@ import (
 	"golang.org/x/exp/mmap"
 )
 
+// LexiconReaders data structure containing all the lexicon file descriptors for reading
 type LexiconReaders struct {
 	Terms                     *os.File
 	TermsInfo, Posting, Freqs io.ReaderAt
 }
 
+// OpenLexicon opens all the LexiconReaders given a path to a folder
 func OpenLexicon(path string) (LexiconReaders, error) {
 	termsReader, err := os.Open(filepath.Join(path, "terms.bin"))
 	if err != nil {
@@ -49,10 +51,12 @@ func (l *LexiconReaders) Close() error {
 	return l.Terms.Close()
 }
 
+// LexiconFiles data structure containing all the lexicon file descriptors for writing
 type LexiconFiles struct {
 	Terms, Posting, Freqs, TermsInfo *os.File
 }
 
+// CreateLexicon creates all the LexiconFiles given a path to an existing folder
 func CreateLexicon(path string) (LexiconFiles, error) {
 	flag := os.O_RDWR | os.O_CREATE | os.O_TRUNC
 

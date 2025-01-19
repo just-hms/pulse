@@ -10,53 +10,61 @@ import (
 	"sync"
 
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
-	"github.com/just-hms/pulse/pkg/spimi/stats"
 	"golang.org/x/sync/errgroup"
 )
 
+// builder is the object responsible for building the index
 type builder struct {
 	lexicon    inverseindex.Lexicon
 	collection inverseindex.Collection
 	mu         sync.Mutex
 
-	dumpCounter uint32
-	stats.IndexingSettings
+	documentPartitionCounter uint32
+	IndexingSettings
 }
 
-func NewBuilder(s stats.IndexingSettings) *builder {
+// NewBuilder returns a spimi.builder
+func NewBuilder(s IndexingSettings) *builder {
 	return &builder{
-		lexicon:          inverseindex.Lexicon{},
-		collection:       inverseindex.Collection{},
-		mu:               sync.Mutex{},
-		dumpCounter:      0,
-		IndexingSettings: s,
+		lexicon:                  inverseindex.Lexicon{},
+		collection:               inverseindex.Collection{},
+		mu:                       sync.Mutex{},
+		documentPartitionCounter: 0,
+		IndexingSettings:         s,
 	}
 }
 
+// add adds a document to the builder
 func (b *builder) add(freqs map[string]uint32, doc inverseindex.Document) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	b.collection.Add(doc)
-	b.lexicon.Add(freqs, uint32(b.collection.Len()-1))
+
+	// the ID is incremental and starts from 0 for each document partition
+	ID := uint32(b.collection.Len() - 1)
+	b.lexicon.Add(freqs, ID)
 }
 
+// encode is called to dump the builder information into a given folder
 func (b *builder) encode(path string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	defer func() { b.dumpCounter++ }()
+	defer func() { b.documentPartitionCounter++ }()
 
 	log.Println("dumping...")
 	defer log.Println("..end")
 
-	var wg errgroup.Group
-
-	partitionPath := filepath.Join(path, fmt.Sprint(b.dumpCounter))
+	// create a folder for the partition using the current counter as name (0,1,2,3....)
+	partitionPath := filepath.Join(path, fmt.Sprint(b.documentPartitionCounter))
 	err := os.MkdirAll(partitionPath, 0o755)
 	if err != nil {
 		return err
 	}
 
+	var wg errgroup.Group
+
+	// write down the documents
 	wg.Go(func() error {
 		f, err := os.Create(filepath.Join(partitionPath, "doc.bin"))
 		if err != nil {
@@ -67,6 +75,7 @@ func (b *builder) encode(path string) error {
 
 	})
 
+	// write down the lexicon
 	wg.Go(func() error {
 		f, err := inverseindex.CreateLexicon(partitionPath)
 		if err != nil {
@@ -80,16 +89,24 @@ func (b *builder) encode(path string) error {
 		return err
 	}
 
-	// write down at which document we arrived
+	// write down the current stats
 	{
+
 		f, err := os.OpenFile(filepath.Join(path, "stats.bin"), os.O_RDWR|os.O_CREATE, 0600)
 		if err != nil {
 			return err
 		}
 
-		s, _ := stats.Load(f)
+		// read the current stats
+		s, _ := LoadSettings(f)
+
+		// add the indexSettings to the stats
 		s.IndexingSettings = b.IndexingSettings
-		s.Update(uint32(b.collection.Len()), b.collection.AvgDocumentSize)
+
+		// update the stats
+		s.UpdateStats(uint32(b.collection.Len()), b.collection.AvgDocumentSize)
+
+		// dump the updated stats into the same file
 		if err := s.Dump(f); err != nil {
 			return err
 		}
@@ -97,11 +114,17 @@ func (b *builder) encode(path string) error {
 		defer f.Close()
 	}
 
-	b.lexicon.Clear()
-	b.collection.Clear()
+	b.clear()
 	return nil
 }
 
+// clear clears all the builde informations
+func (b *builder) clear() {
+	b.lexicon.Clear()
+	b.collection.Clear()
+}
+
+// ReadPartitions returns the file entry of all the partitions
 func ReadPartitions(path string) ([]fs.DirEntry, error) {
 	partitions, err := os.ReadDir(path)
 	if err != nil {

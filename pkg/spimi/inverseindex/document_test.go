@@ -17,7 +17,9 @@ func TestDocumentIO(t *testing.T) {
 
 	defer f.Close()
 
+	// create a collection
 	col := inverseindex.Collection{}
+	// add some documents
 	col.Add(
 		inverseindex.NewDocument("1", 10),
 		inverseindex.NewDocument("2", 2),
@@ -25,11 +27,12 @@ func TestDocumentIO(t *testing.T) {
 		inverseindex.NewDocument("19", 24),
 	)
 
+	// encode the collection into a file
 	err = col.Encode(f)
 	req.NoError(err)
 
+	// check that the decode function works
 	doc := inverseindex.Document{}
-
 	{
 		err := doc.Decode(2, f)
 		req.NoError(err)

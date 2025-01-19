@@ -14,10 +14,10 @@ import (
 	"unsafe"
 
 	iradix "github.com/hashicorp/go-immutable-radix/v2"
+	"github.com/just-hms/pulse/pkg/preprocess"
 	"github.com/just-hms/pulse/pkg/spimi"
 	"github.com/just-hms/pulse/pkg/spimi/inverseindex"
 	"github.com/just-hms/pulse/pkg/spimi/reader"
-	"github.com/just-hms/pulse/pkg/spimi/stats"
 	"github.com/just-hms/pulse/pkg/structures/radix"
 	"github.com/stretchr/testify/require"
 )
@@ -26,11 +26,14 @@ func TestSpimi(t *testing.T) {
 	t.Parallel()
 	req := require.New(t)
 
-	s := stats.IndexingSettings{
-		Stemming:          false,
-		StopWordsRemoval:  false,
+	s := spimi.IndexingSettings{
+		PreprocessSettings: preprocess.Settings{
+			Stemming:         false,
+			StopWordsRemoval: false,
+		},
 		Compression:       false,
 		MemoryThresholdMB: spimi.DefaulMemoryThreshold,
+		NumWorkers:        1,
 	}
 
 	spimiBuilder := spimi.NewBuilder(s)
@@ -44,7 +47,7 @@ func TestSpimi(t *testing.T) {
 
 		r := reader.NewMsMarco(bufio.NewReader(f), 10)
 
-		err = spimiBuilder.Parse(r, 1, path)
+		err = spimiBuilder.Parse(r, path)
 		req.NoError(err)
 	}
 
@@ -101,7 +104,7 @@ func TestSpimi(t *testing.T) {
 		for i := range 2 {
 			log.Printf(`"testing": {"token":%q, "partition":"%d"}`, token, i)
 
-			readers, err := spimi.OpenSpimiFiles(filepath.Join(path, fmt.Sprint(i)))
+			readers, err := spimi.OpenSpimiReaders(filepath.Join(path, fmt.Sprint(i)))
 			req.NoError(err)
 
 			lLexicon := iradix.New[uint32]()

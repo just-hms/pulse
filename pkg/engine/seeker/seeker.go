@@ -12,6 +12,7 @@ import (
 	"github.com/just-hms/pulse/pkg/structures/withkey"
 )
 
+// Sekeer is the data structure used to travers both the posting list and the frequencies of a given term
 type Seeker struct {
 	postings, freqs io.Reader
 
@@ -25,11 +26,15 @@ type Seeker struct {
 }
 
 func NewSeeker(postings, freqs io.ReaderAt, t withkey.WithKey[inverseindex.LocalTerm], compression bool) *Seeker {
+	// a term contains the start and the end of the two lists
+	// create a NewSectionReader for both to use the Read() call instead of the ReadAt()
+	// this simplifies performing sequential reads.
 	s := &Seeker{
 		Term:     t,
 		postings: io.NewSectionReader(postings, int64(t.Value.PostStart), int64(t.Value.PostLength)),
 		freqs:    io.NewSectionReader(freqs, int64(t.Value.FreqStart), int64(t.Value.PostLength)),
 	}
+	// if compression is enable use unary compression for the frequencies and delta variable bytes for the posting list
 	if compression {
 		s.freqs = unary.NewReader(s.freqs, 1)
 		s.postings = deltavarint.NewReader(s.postings)
@@ -37,6 +42,7 @@ func NewSeeker(postings, freqs io.ReaderAt, t withkey.WithKey[inverseindex.Local
 	return s
 }
 
+// Next reads the next posting list/frencuency setting the s.DocumentID and s.TermFrequency fields inside the Seeker struct
 func (s *Seeker) Next() error {
 	if _, err := s.postings.Read(s.buf[:]); err != nil {
 		if errors.Is(err, io.EOF) {
@@ -58,6 +64,7 @@ func (s *Seeker) Next() error {
 	return nil
 }
 
+// String return the string representation of the Seeker
 func (s *Seeker) String() string {
 	return fmt.Sprintf(
 		"{%s postings:[%d,%d], terms[%d,%d]}",
