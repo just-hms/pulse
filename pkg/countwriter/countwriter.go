@@ -2,27 +2,22 @@ package countwriter
 
 import (
 	"io"
-	"os"
 )
 
 type Writer struct {
-	*os.File
+	io.Writer
 	Count int
 }
 
-func NewWriter(f *os.File) *Writer {
+func NewWriter(w io.Writer) *Writer {
 	return &Writer{
-		File:  f,
-		Count: 0,
+		Writer: w,
+		Count:  0,
 	}
 }
 
 func (cw *Writer) Write(p []byte) (n int, err error) {
-	// todo: check if this is necessary
-	if _, err := cw.File.Seek(0, io.SeekEnd); err != nil {
-		return 0, err
-	}
-	n, err = cw.File.Write(p)
+	n, err = cw.Writer.Write(p)
 	cw.Count += n
 	return n, err
 }
