@@ -20,7 +20,7 @@ import (
 //   - q prefix stands for query
 //   - l prefix stands for local (to a partition)
 //   - q prefix stands for global
-func (e *engine) Search(query string, seachSettings *SearchSettings) ([]*DocumentInfo, error) {
+func (e *engine) Search(query string, searchSettings *SearchSettings) ([]*DocumentInfo, error) {
 
 	// extract query tokens from the query using the same preprocessing settings used during indexing
 	qTokens := preprocess.Tokens(query, e.spimiStats.PreprocessSettings)
@@ -52,8 +52,8 @@ func (e *engine) Search(query string, seachSettings *SearchSettings) ([]*Documen
 	// launch the query in each partition
 	for i := range e.partitions {
 		wg.Go(func() error {
-			results[i].Cap = seachSettings.K
-			return e.searchPartition(i, qgTerms, seachSettings, &results[i])
+			results[i].Cap = searchSettings.K
+			return e.searchPartition(i, qgTerms, searchSettings, &results[i])
 		})
 	}
 
@@ -62,7 +62,7 @@ func (e *engine) Search(query string, seachSettings *SearchSettings) ([]*Documen
 	}
 
 	// add each partition's result to the final result
-	result := heap.Heap[*DocumentInfo]{Cap: seachSettings.K}
+	result := heap.Heap[*DocumentInfo]{Cap: searchSettings.K}
 	for _, res := range results {
 		result.Push(res.Values()...)
 	}
