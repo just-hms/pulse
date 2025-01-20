@@ -2,6 +2,10 @@
 
 `Multimedia Information Retrieval and Computer Vision` search engine project.
 
+## Documentation
+
+All information about the documentation are inside [docs.pdf](docs/docs.pdf)
+
 ## Install
 
 ```sh
@@ -107,7 +111,3 @@ Global Flags:
 ## `trec_eval`
 
 All information about `trec_eval` are inside this [README.md](trec_eval/README.md)
-
-## Documentation
-
-All information about the documentation are inside [docs.pdf](docs/docs.pdf)
