@@ -18,7 +18,7 @@ var (
 )
 
 // Clean cleans up a string by:
-//   - normalizing the unicoce characters
+//   - normalizing the unicode characters
 //   - removing html tags
 //   - removing punctuation
 func Clean(s string) string {
